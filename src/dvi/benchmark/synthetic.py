@@ -52,3 +52,26 @@ def inject_value_substitution(
         .otherwise(pl.col(column))
         .alias(column)
     )
+
+
+def categorical(column: str, counts: dict[str, int], seed: int = 0) -> pl.DataFrame:
+    """Build a single-column categorical frame with exact per-value counts.
+
+    Counts are exact (deterministic tests); row order is seeded-shuffled for realism.
+    """
+    values: list[str] = []
+    for value, count in counts.items():
+        values.extend([value] * count)
+    random.Random(seed).shuffle(values)
+    return pl.DataFrame({column: values})
+
+
+def numeric(column: str, values: list[float]) -> pl.DataFrame:
+    """Build a single-column numeric frame from an explicit list of values."""
+    return pl.DataFrame({column: [float(v) for v in values]})
+
+
+def ramp(n: int, low: float = 10.0, high: float = 100.0) -> list[float]:
+    """A deterministic spread of ``n`` values cycling across ``[low, high]``."""
+    span = high - low
+    return [low + (i % (int(span) + 1)) for i in range(n)]

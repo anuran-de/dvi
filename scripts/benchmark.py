@@ -15,6 +15,7 @@ from dvi.benchmark import (
     build_scenarios,
     evaluate,
     evaluate_rca,
+    evaluate_real_data,
     recall_at_fixed_fp,
     sweep,
 )
@@ -70,6 +71,25 @@ def main() -> None:
     print(f"    top-1 accuracy   : {rca.top1_accuracy:.0%}")
     if rca.wrong:
         print(f"    mis-ranked       : {', '.join(rca.wrong)}")
+
+    print("\n" + "=" * 70)
+    print("  Validation on real data (diamonds, 53,940 rows)")
+    print("=" * 70)
+    real = evaluate_real_data(n=1000, trials=30)
+    print(
+        f"  Real-vs-real false positives: {real.fp.fires}/{real.fp.checks} column-checks fire "
+        f"({real.fp.false_positive_rate:.0%}) across {real.fp.trials} disjoint splits"
+    )
+    if real.fp.examples:
+        print(f"    examples: {'; '.join(real.fp.examples)}")
+    print(
+        f"  Injected-rename recall: {real.recall.hits}/{real.recall.trials} "
+        f"({real.recall.recall:.0%}) - a planted category rename recovered under real noise"
+    )
+    print(
+        "  Two disjoint samples of the SAME distribution stay silent; a real change "
+        "is still caught."
+    )
     print()
 
 

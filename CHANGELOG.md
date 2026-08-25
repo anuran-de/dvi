@@ -5,6 +5,35 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M2 — Signature taxonomy + benchmark (complete)
+
+The full flagship signature set, plus a labelled benchmark that measures recall
+against a false-positive budget.
+
+- **detection** — four new deterministic signatures:
+  - `detect_case_format_normalization` (#2): categories re-spelled (casefold +
+    whitespace) with the normalized set and masses preserved.
+  - `detect_category_split_merge` (#3): one-to-many / many-to-one mass
+    redistribution with conserved total mass.
+  - `detect_numeric_distribution_shift` (#4): behavioral change in a numeric
+    column, measured as normalized quantile movement (tunable threshold).
+  - `detect_unit_scale_shift` (#5): rigid affine re-encoding (dollars → cents,
+    timezone offset), fitted from robust quantile anchors.
+- **pipeline** — detector registry with **precedence**: a more specific
+  signature suppresses a more general one on the same column (#5 over #4,
+  #2 over #1). Distribution-shift threshold is tunable through `detect_symptoms`.
+- **benchmark** — `build_scenarios`: a labelled suite of 5 positives (one per
+  signature), 3 normal-variation negatives, and 4 benign decoys (2× volume, a
+  new small category, sub-threshold numeric drift). `evaluate` /
+  `recall_at_fixed_fp` / `sweep` score recall and false-positive rate and trace
+  the operating curve.
+- **demo** — `scripts/benchmark.py`: prints the report and operating curve.
+- **result** — 100% recall at 0% false positives at the shipped operating point;
+  the sweep shows false positives below t=0.08 and a missed distribution-shift
+  positive at t≥0.43.
+
+58 tests, all green. CI now also runs the benchmark end to end.
+
 ### M1 — Walking skeleton (complete)
 
 The thinnest end-to-end path that proves the core hypothesis: a silent semantic

@@ -50,3 +50,5 @@ jobs:
       - run: pip install -e .
       - name: Run the M1 demo
         run: python scripts/demo.py
+      - name: Run the M2 benchmark
+        run: python scripts/benchmark.py

@@ -58,7 +58,21 @@ Table snapshot (T1)          Table snapshot (T2)
 - **Change signature** — a deterministic test over two profiles (T1 → T2) that
   recognises a characteristic fingerprint and emits a **Symptom** with a
   magnitude. Signatures never claim to understand meaning; they recognise
-  statistical shapes (e.g. mass-conserving value substitution).
+  statistical shapes (e.g. mass-conserving value substitution). The five flagship
+  signatures (M2):
+
+  | # | Signature | Fingerprint |
+  |---|-----------|-------------|
+  | 1 | Value substitution | One category's mass collapses; a new value absorbs it (masses conserved) |
+  | 2 | Case/format normalization | Categories re-spelled; normalized (casefold + whitespace) set and masses preserved |
+  | 3 | Category split/merge | One-to-many / many-to-one redistribution with conserved total mass |
+  | 4 | Numeric distribution shift | Normalized quantile movement beyond a tunable threshold |
+  | 5 | Unit/scale shift | Every quantile lands on one fitted affine line (rigid re-encoding) |
+
+- **Signature precedence** — a more specific signature suppresses a more general
+  one when both fire on the same column, so an incident is described by its most
+  precise cause. #5 (unit/scale) suppresses #4 (distribution shift); #2
+  (re-spelling) suppresses #1 (substitution). Encoded in the pipeline registry.
 
 - **Symptom vs. Incident** — a fired signature is a *symptom*. It only escalates
   to an *incident* (the thing worth a human's attention) when corroborated by
@@ -73,12 +87,30 @@ Table snapshot (T1)          Table snapshot (T2)
 ```text
 src/dvi/
   profiling/    ColumnProfile + profiler over a Polars/DuckDB relation
-  detection/    change signatures (M1: value substitution)
-  lineage/      dbt manifest parsing → networkx graph  (M2+)
+  detection/    change signatures #1-5 + Symptom
+  lineage/      dbt manifest parsing → networkx graph
   rca/          corroboration + root-cause ranking      (M1 thin, M3 calibrated)
   incidents/    incident + evidence synthesis
-  benchmark/    synthetic data + failure injection      (M2+)
+  pipeline/     detector registry + precedence; analyze_change orchestration
+  benchmark/    synthetic data, labelled scenarios, evaluation runner
 ```
+
+## 6. Benchmark and operating point
+
+The benchmark (`dvi.benchmark`) is the credibility instrument. Its honesty comes
+from the **decoys** — legitimate changes engineered to superficially resemble an
+incident yet must stay silent (a 2× volume jump with identical shares, a new
+category at sub-threshold share, sub-threshold numeric drift) — alongside one
+clean positive per signature and normal-variation negatives.
+
+`evaluate` scores **recall** (positives caught with the correct signature) and
+**false-positive rate** (negatives/decoys that fired). `sweep` / `recall_at_fixed_fp`
+vary the one continuous knob, the distribution-shift threshold, to trace the
+operating curve and pick a robust point (the middle of the zero-FP band). At the
+shipped default the detectors reach 100% recall at 0% false positives; the curve
+makes the trade-off — noise below t≈0.08, missed shifts above t≈0.43 — explicit
+and measured rather than asserted. The categorical signatures are effectively
+fixed; only the numeric detector is threshold-tunable in v1.
 
 ## 5. Decisions log
 

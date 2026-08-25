@@ -1,0 +1,119 @@
+"""Signature #2 — case/format normalization.
+
+Recognises when a categorical column's values were re-spelled without changing
+the underlying categories: ``"US" -> "us"``, a trailing space appearing on a
+status, ``"Completed" -> "COMPLETED"``. Casefold and collapse whitespace and the
+category set and its masses are unchanged — only the surface form moved.
+
+This is the discriminator against value substitution (#1): there, mass relocates
+between categories that stay distinct even after normalization; here, the
+*normalized* categories and their shares are preserved and only raw spelling
+changed. Silent to schema/volume/null checks, and easy to mistake for "nothing
+happened" because a naive distinct-count is unchanged.
+"""
+
+from __future__ import annotations
+
+import re
+
+from dvi.profiling import ColumnProfile
+
+from .symptom import Symptom
+
+# The retained top_k must cover at least this fraction of non-null rows for the
+# normalized comparison to be trustworthy (see #1 for the same guard).
+MIN_TOP_K_COVERAGE = 0.9
+# Total-variation distance between the two normalized distributions must be below
+# this for the masses to count as "preserved".
+MASS_TOLERANCE = 0.05
+
+_WHITESPACE = re.compile(r"\s+")
+
+
+def _normalize(value: str) -> str:
+    """Casefold and collapse surrounding/internal whitespace."""
+    return _WHITESPACE.sub(" ", value.strip()).casefold()
+
+
+def _coverage(profile: ColumnProfile) -> float:
+    if profile.non_null_count == 0:
+        return 0.0
+    return sum(profile.top_k.values()) / profile.non_null_count
+
+
+def _by_normalized(profile: ColumnProfile) -> dict[str, dict[str, int]]:
+    """Map normalized key -> {raw key: count} for the retained top_k."""
+    grouped: dict[str, dict[str, int]] = {}
+    for raw, count in profile.top_k.items():
+        grouped.setdefault(_normalize(raw), {})[raw] = count
+    return grouped
+
+
+def detect_case_format_normalization(
+    baseline: ColumnProfile, current: ColumnProfile
+) -> Symptom | None:
+    """Return a Symptom if categories were re-spelled but not otherwise changed."""
+    if not baseline.top_k or not current.top_k:
+        return None
+    if _coverage(baseline) < MIN_TOP_K_COVERAGE or _coverage(current) < MIN_TOP_K_COVERAGE:
+        return None
+
+    base_groups = _by_normalized(baseline)
+    curr_groups = _by_normalized(current)
+
+    # Pure re-spelling preserves the normalized category set exactly.
+    if set(base_groups) != set(curr_groups):
+        return None
+
+    base_non_null = baseline.non_null_count
+    curr_non_null = current.non_null_count
+    if base_non_null == 0 or curr_non_null == 0:
+        return None
+
+    changed_mass = 0.0
+    tv_distance = 0.0
+    changes: list[tuple[float, str, str, str]] = []
+    for norm in base_groups:
+        base_raw = base_groups[norm]
+        curr_raw = curr_groups[norm]
+        base_share = sum(base_raw.values()) / base_non_null
+        curr_share = sum(curr_raw.values()) / curr_non_null
+        tv_distance += abs(curr_share - base_share)
+
+        # Representative raw spelling on each side (dominant, lexicographic tie-break).
+        base_rep = min(base_raw.items(), key=lambda item: (-item[1], item[0]))[0]
+        curr_rep = min(curr_raw.items(), key=lambda item: (-item[1], item[0]))[0]
+        if base_rep != curr_rep:
+            changed_mass += base_share
+            changes.append((base_share, norm, base_rep, curr_rep))
+
+    tv_distance /= 2.0
+    if tv_distance > MASS_TOLERANCE:
+        return None
+    if not changes:
+        # Same normalized keys, same spelling: nothing actually changed.
+        return None
+
+    # Report the largest re-spelled category (lexicographic tie-break on norm key).
+    _, _, from_value, to_value = min(changes, key=lambda c: (-c[0], c[1]))
+    magnitude = min(1.0, changed_mass)
+
+    return Symptom(
+        signature="case_format_normalization",
+        column=baseline.name,
+        magnitude=magnitude,
+        from_value=from_value,
+        to_value=to_value,
+        description=(
+            f"Categories in {baseline.name!r} were re-spelled without changing the "
+            f"underlying set (e.g. {from_value!r} -> {to_value!r}); "
+            f"{changed_mass:.1%} of rows changed surface form."
+        ),
+        evidence={
+            "changed_share": round(changed_mass, 4),
+            "respelled_count": len(changes),
+            "example_from": from_value,
+            "example_to": to_value,
+            "total_variation": round(tv_distance, 4),
+        },
+    )

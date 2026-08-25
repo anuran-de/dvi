@@ -18,6 +18,19 @@ def test_unit_scale_shift_suppresses_distribution_shift_on_same_column():
     assert "numeric_distribution_shift" not in signatures
 
 
+def test_case_format_suppresses_value_substitution_on_same_column():
+    # Lowercasing every category also looks like a mass-conserving substitution to
+    # #1, but the re-spelling explanation (#2) is more specific and should win.
+    before = pl.DataFrame({"country": ["US"] * 60 + ["UK"] * 25 + ["DE"] * 15})
+    after = pl.DataFrame({"country": ["us"] * 60 + ["uk"] * 25 + ["de"] * 15})
+
+    symptoms = detect_symptoms(before, after, columns=["country"])
+    signatures = {s.signature for s in symptoms}
+
+    assert "case_format_normalization" in signatures
+    assert "value_substitution" not in signatures
+
+
 def test_behavioral_shift_still_reports_distribution_shift():
     # A shape change that is NOT a rigid affine map: spread fans out, median stable.
     before = pl.DataFrame({"amount": [50.0] * 90 + [45.0] * 5 + [55.0] * 5})

@@ -16,6 +16,7 @@ from datetime import datetime
 import polars as pl
 
 from dvi.detection import (
+    detect_case_format_normalization,
     detect_numeric_distribution_shift,
     detect_unit_scale_shift,
     detect_value_substitution,
@@ -29,15 +30,18 @@ from dvi.rca import ChangeEvent, Observation, rank_root_causes
 # returns a Symptom or None.
 _DETECTORS = [
     detect_value_substitution,
+    detect_case_format_normalization,
     detect_unit_scale_shift,
     detect_numeric_distribution_shift,
 ]
 
 # Precedence: a more specific signature suppresses a more general one when both
-# fire on the same column. A rigid unit/scale re-encoding (#5) is a special case
-# of a distribution shift (#4), so reporting both would be noise — keep only #5.
+# fire on the same column, so reporting both would be noise.
+#   #5 (unit/scale) is a special case of #4 (distribution shift) -> keep #5.
+#   #2 (re-spelling) is a special case of #1 (substitution)      -> keep #2.
 _SUPPRESSES = {
     "unit_scale_shift": {"numeric_distribution_shift"},
+    "case_format_normalization": {"value_substitution"},
 }
 
 

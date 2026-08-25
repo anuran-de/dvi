@@ -15,15 +15,39 @@ from datetime import datetime
 
 import polars as pl
 
-from dvi.detection import detect_value_substitution
+from dvi.detection import (
+    detect_numeric_distribution_shift,
+    detect_unit_scale_shift,
+    detect_value_substitution,
+)
 from dvi.incidents import Incident, synthesize_incident
 from dvi.lineage import LineageGraph
 from dvi.profiling import profile_column
 from dvi.rca import ChangeEvent, Observation, rank_root_causes
 
-# Registry of the signatures active in M1. Each takes (baseline, current)
-# profiles and returns a Symptom or None. More signatures are added in M2.
-_DETECTORS = [detect_value_substitution]
+# Registry of the active signatures. Each takes (baseline, current) profiles and
+# returns a Symptom or None.
+_DETECTORS = [
+    detect_value_substitution,
+    detect_unit_scale_shift,
+    detect_numeric_distribution_shift,
+]
+
+# Precedence: a more specific signature suppresses a more general one when both
+# fire on the same column. A rigid unit/scale re-encoding (#5) is a special case
+# of a distribution shift (#4), so reporting both would be noise — keep only #5.
+_SUPPRESSES = {
+    "unit_scale_shift": {"numeric_distribution_shift"},
+}
+
+
+def _apply_precedence(symptoms: list):
+    """Drop symptoms that a more specific co-located signature has superseded."""
+    suppressed: set[tuple[str, str]] = set()
+    for s in symptoms:
+        for victim in _SUPPRESSES.get(s.signature, ()):
+            suppressed.add((s.column, victim))
+    return [s for s in symptoms if (s.column, s.signature) not in suppressed]
 
 
 def detect_symptoms(
@@ -41,7 +65,7 @@ def detect_symptoms(
             symptom = detector(baseline, current)
             if symptom is not None:
                 symptoms.append(symptom)
-    return symptoms
+    return _apply_precedence(symptoms)
 
 
 def analyze_change(

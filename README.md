@@ -51,7 +51,7 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
-> **M2 — the signature taxonomy + benchmark: complete.** All five flagship signatures are implemented, wired with precedence rules, and measured against a labelled benchmark. On a suite of one clean positive per signature plus normal-variation negatives and benign decoys, DVI hits **100% recall at a 0% false-positive rate** at the shipped operating point. 58 tests, all green.
+> **M2 — the signature taxonomy + benchmark: complete.** All five flagship signatures are implemented, wired with precedence rules, and measured against a labelled benchmark. On a suite of one clean positive per signature plus normal-variation negatives and benign decoys, DVI hits **100% recall at a 0% false-positive rate** at the shipped operating point, and ranks the true root cause **#1 under concurrent distractor deploys** on every RCA case. 60 tests, all green.
 >
 > **M1 — walking skeleton: complete.** The thinnest end-to-end path proving the core hypothesis: profile → temporal snapshots → detector → dbt lineage → corroboration → ranked root cause with evidence, on synthetic data.
 
@@ -125,6 +125,8 @@ Anyone can build positives their own detector catches — the credibility comes 
 ```
 
 The safe band `[0.08, 0.43)` gives full recall at zero false positives; push the threshold too low and benign numeric drift becomes noise, too high and real shifts slip through. That trade-off is *measured*, not asserted.
+
+The same runner scores **root-cause ranking under concurrency**: given a symptom and several near-simultaneous deploys, it checks the true cause ranks #1. Irrelevant deploys (no lineage path) and post-symptom changes are excluded outright; among genuine upstream candidates the closer-in-time / higher-coverage one wins. Top-1 accuracy is 100% across the RCA cases.
 
 ## Roadmap
 

@@ -11,7 +11,13 @@ while staying silent on legitimate variation like a doubling in volume.
 
 from __future__ import annotations
 
-from dvi.benchmark import build_scenarios, evaluate, recall_at_fixed_fp, sweep
+from dvi.benchmark import (
+    build_scenarios,
+    evaluate,
+    evaluate_rca,
+    recall_at_fixed_fp,
+    sweep,
+)
 from dvi.detection import DEFAULT_DISTRIBUTION_THRESHOLD
 
 
@@ -57,6 +63,13 @@ def main() -> None:
         f"threshold={op.threshold:.2f}, recall={op.recall:.0%}, "
         f"fp_rate={op.false_positive_rate:.0%}"
     )
+
+    rca = evaluate_rca()
+    print("\n  Root-cause ranking under distractors:")
+    print(f"    cases            : {len(rca.results)}")
+    print(f"    top-1 accuracy   : {rca.top1_accuracy:.0%}")
+    if rca.wrong:
+        print(f"    mis-ranked       : {', '.join(rca.wrong)}")
     print()
 
 

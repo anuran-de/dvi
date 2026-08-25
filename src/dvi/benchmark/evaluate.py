@@ -13,7 +13,9 @@ from dataclasses import dataclass
 
 from dvi.detection import DEFAULT_DISTRIBUTION_THRESHOLD
 from dvi.pipeline.analyze import detect_symptoms
+from dvi.rca import rank_root_causes
 
+from .rca_cases import RcaCase, build_rca_cases
 from .scenarios import Scenario, build_scenarios
 
 
@@ -111,6 +113,39 @@ def sweep(
     if thresholds is None:
         thresholds = _threshold_grid()
     return [evaluate(scenarios, dist_threshold=t) for t in thresholds]
+
+
+@dataclass(frozen=True)
+class RcaCaseResult:
+    case: RcaCase
+    ranked_ids: list[str]
+    top1_correct: bool
+
+
+@dataclass(frozen=True)
+class RcaReport:
+    results: list[RcaCaseResult]
+    top1_accuracy: float
+
+    @property
+    def wrong(self) -> list[str]:
+        return [r.case.name for r in self.results if not r.top1_correct]
+
+
+def evaluate_rca(cases: list[RcaCase] | None = None) -> RcaReport:
+    """Score root-cause ranking: does the true cause rank #1 under distractors?"""
+    if cases is None:
+        cases = build_rca_cases()
+
+    results: list[RcaCaseResult] = []
+    for case in cases:
+        ranked = rank_root_causes(case.observations, case.changes, case.lineage)
+        ranked_ids = [c.change.id for c in ranked]
+        top1_correct = bool(ranked_ids) and ranked_ids[0] == case.true_change_id
+        results.append(RcaCaseResult(case, ranked_ids, top1_correct))
+
+    accuracy = sum(r.top1_correct for r in results) / len(results) if results else 0.0
+    return RcaReport(results, accuracy)
 
 
 def recall_at_fixed_fp(

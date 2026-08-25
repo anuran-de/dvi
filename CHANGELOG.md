@@ -27,12 +27,16 @@ against a false-positive budget.
   new small category, sub-threshold numeric drift). `evaluate` /
   `recall_at_fixed_fp` / `sweep` score recall and false-positive rate and trace
   the operating curve.
-- **demo** — `scripts/benchmark.py`: prints the report and operating curve.
-- **result** — 100% recall at 0% false positives at the shipped operating point;
-  the sweep shows false positives below t=0.08 and a missed distribution-shift
-  positive at t≥0.43.
+- **benchmark (RCA)** — `build_rca_cases` + `evaluate_rca`: labelled root-cause
+  cases with concurrent distractor deploys (irrelevant, post-symptom, and weaker
+  upstream competitors). Measures top-1 ranking accuracy.
+- **demo** — `scripts/benchmark.py`: prints the detection report, operating
+  curve, and RCA top-1 accuracy.
+- **result** — 100% recall at 0% false positives at the shipped operating point
+  (FPs appear below t=0.08, distribution-shift positive missed at t≥0.43); 100%
+  top-1 root-cause accuracy under distractors.
 
-58 tests, all green. CI now also runs the benchmark end to end.
+60 tests, all green. CI now also runs the benchmark end to end.
 
 ### M1 — Walking skeleton (complete)
 

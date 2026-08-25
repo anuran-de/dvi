@@ -56,6 +56,18 @@ def test_stable_distribution_is_not_a_unit_shift():
     assert detect_unit_scale_shift(_num("amount", qs), _num("amount", dict(qs))) is None
 
 
+def test_near_identical_offset_distribution_is_not_a_unit_shift():
+    # A real-data failure mode: a narrow-spread column living far from zero (e.g.
+    # a percentage ~61) sampled twice. The two halves are the SAME distribution
+    # (median 61.8 -> 61.9), but a joint slope+intercept fit turns quantile jitter
+    # into a bogus "additive offset of +4". Fitting slope and offset separately,
+    # each against sampling noise, must read this as no change.
+    baseline = _num("depth", {"p05": 59.2, "p25": 61.0, "p50": 61.8, "p75": 62.5, "p95": 63.8})
+    current = _num("depth", {"p05": 59.4, "p25": 61.1, "p50": 61.9, "p75": 62.5, "p95": 63.6})
+
+    assert detect_unit_scale_shift(baseline, current) is None
+
+
 def test_returns_none_for_non_numeric():
     cat = ColumnProfile(
         name="country", row_count=10, null_count=0, distinct_count=2, top_k={"UK": 6, "US": 4}

@@ -18,7 +18,11 @@ htmlcov/
 *.duckdb.wal
 *.sqlite
 *.db
-/data/
+/data/*
+# ...except the bundled real-data benchmark fixture (required by CI, offline)
+# and its provenance note.
+!/data/diamonds.parquet
+!/data/README.md
 /.dvi_cache/
 
 # Env / secrets

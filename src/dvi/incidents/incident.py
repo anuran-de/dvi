@@ -52,9 +52,10 @@ def synthesize_incident(
     downstream: set[str] = set()
     for target in top.change.targets:
         downstream |= lineage.downstream(target)
-    affected = downstream | {o.asset for o in top.explained}
+    # Purely downstream impact: exclude the changed asset(s) themselves.
+    affected = (downstream | {o.asset for o in top.explained}) - set(top.change.targets)
 
-    propagates = bool(downstream - set(top.change.targets))
+    propagates = bool(affected)
     max_magnitude = max((o.symptom.magnitude for o in top.explained), default=0.0)
     severity = _severity(max_magnitude, propagates)
 
@@ -68,7 +69,7 @@ def synthesize_incident(
 
     detected_at = max(o.observed_at for o in top.explained)
     return Incident(
-        title=f"Semantic change in {worst.symptom.column} — {label}",
+        title=f"Semantic change in {worst.symptom.column} - {label}",
         severity=severity,
         summary=summary,
         primary_cause=top,

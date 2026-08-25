@@ -9,6 +9,21 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class NumericStats(BaseModel):
+    """Distribution summary for a numeric column (drives signatures #4 and #5)."""
+
+    count: int
+    mean: float
+    stddev: float
+    minimum: float
+    maximum: float
+    quantiles: dict[str, float] = Field(default_factory=dict)
+
+    @property
+    def median(self) -> float:
+        return self.quantiles.get("p50", self.mean)
+
+
 class ColumnProfile(BaseModel):
     """A statistical summary of a single column at a point in time."""
 
@@ -17,6 +32,7 @@ class ColumnProfile(BaseModel):
     null_count: int
     distinct_count: int
     top_k: dict[str, int] = Field(default_factory=dict)
+    numeric: NumericStats | None = None
 
     @property
     def non_null_count(self) -> int:

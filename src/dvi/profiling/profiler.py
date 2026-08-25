@@ -9,9 +9,30 @@ from __future__ import annotations
 
 import polars as pl
 
-from .profile import ColumnProfile
+from .profile import ColumnProfile, NumericStats
 
 DEFAULT_TOP_K = 50
+_QUANTILES = {"p05": 0.05, "p25": 0.25, "p50": 0.50, "p75": 0.75, "p95": 0.95}
+
+
+def _numeric_stats(series: pl.Series) -> NumericStats | None:
+    """Compute numeric distribution stats, or None for non-numeric/empty columns."""
+    if not series.dtype.is_numeric():
+        return None
+    non_null = series.drop_nulls()
+    if non_null.len() == 0:
+        return None
+    return NumericStats(
+        count=non_null.len(),
+        mean=float(non_null.mean()),
+        stddev=float(non_null.std()) if non_null.len() > 1 else 0.0,
+        minimum=float(non_null.min()),
+        maximum=float(non_null.max()),
+        quantiles={
+            name: float(non_null.quantile(q, interpolation="linear"))
+            for name, q in _QUANTILES.items()
+        },
+    )
 
 
 def profile_column(series: pl.Series, top_k: int = DEFAULT_TOP_K) -> ColumnProfile:
@@ -44,4 +65,5 @@ def profile_column(series: pl.Series, top_k: int = DEFAULT_TOP_K) -> ColumnProfi
         null_count=null_count,
         distinct_count=distinct_count,
         top_k=counts,
+        numeric=_numeric_stats(series),
     )

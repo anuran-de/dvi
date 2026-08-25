@@ -17,6 +17,7 @@ import polars as pl
 
 from dvi.detection import (
     detect_case_format_normalization,
+    detect_category_split_merge,
     detect_numeric_distribution_shift,
     detect_unit_scale_shift,
     detect_value_substitution,
@@ -31,6 +32,7 @@ from dvi.rca import ChangeEvent, Observation, rank_root_causes
 _DETECTORS = [
     detect_value_substitution,
     detect_case_format_normalization,
+    detect_category_split_merge,
     detect_unit_scale_shift,
     detect_numeric_distribution_shift,
 ]

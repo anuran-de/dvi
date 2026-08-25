@@ -31,6 +31,20 @@ def test_case_format_suppresses_value_substitution_on_same_column():
     assert "value_substitution" not in signatures
 
 
+def test_split_is_reported_as_split_not_substitution():
+    before = pl.DataFrame({"category": ["Electronics"] * 50 + ["Books"] * 30 + ["Toys"] * 20})
+    after = pl.DataFrame(
+        {"category": ["Consumer Electronics"] * 30 + ["Home Electronics"] * 20
+         + ["Books"] * 30 + ["Toys"] * 20}
+    )
+
+    symptoms = detect_symptoms(before, after, columns=["category"])
+    signatures = {s.signature for s in symptoms}
+
+    assert "category_split_merge" in signatures
+    assert "value_substitution" not in signatures
+
+
 def test_behavioral_shift_still_reports_distribution_shift():
     # A shape change that is NOT a rigid affine map: spread fans out, median stable.
     before = pl.DataFrame({"amount": [50.0] * 90 + [45.0] * 5 + [55.0] * 5})

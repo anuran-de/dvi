@@ -1,6 +1,7 @@
 """Change detection: deterministic signatures over pairs of column profiles."""
 
 from .case_format import detect_case_format_normalization
+from .distribution_shift import DEFAULT_THRESHOLD as DEFAULT_DISTRIBUTION_THRESHOLD
 from .distribution_shift import detect_numeric_distribution_shift
 from .split_merge import detect_category_split_merge
 from .symptom import Symptom
@@ -8,6 +9,7 @@ from .unit_scale_shift import detect_unit_scale_shift
 from .value_substitution import detect_value_substitution
 
 __all__ = [
+    "DEFAULT_DISTRIBUTION_THRESHOLD",
     "Symptom",
     "detect_case_format_normalization",
     "detect_category_split_merge",

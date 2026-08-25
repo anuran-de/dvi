@@ -16,6 +16,7 @@ from datetime import datetime
 import polars as pl
 
 from dvi.detection import (
+    DEFAULT_DISTRIBUTION_THRESHOLD,
     detect_case_format_normalization,
     detect_category_split_merge,
     detect_numeric_distribution_shift,
@@ -27,16 +28,6 @@ from dvi.lineage import LineageGraph
 from dvi.profiling import profile_column
 from dvi.rca import ChangeEvent, Observation, rank_root_causes
 
-# Registry of the active signatures. Each takes (baseline, current) profiles and
-# returns a Symptom or None.
-_DETECTORS = [
-    detect_value_substitution,
-    detect_case_format_normalization,
-    detect_category_split_merge,
-    detect_unit_scale_shift,
-    detect_numeric_distribution_shift,
-]
-
 # Precedence: a more specific signature suppresses a more general one when both
 # fire on the same column, so reporting both would be noise.
 #   #5 (unit/scale) is a special case of #4 (distribution shift) -> keep #5.
@@ -45,6 +36,22 @@ _SUPPRESSES = {
     "unit_scale_shift": {"numeric_distribution_shift"},
     "case_format_normalization": {"value_substitution"},
 }
+
+
+def _build_detectors(dist_threshold: float):
+    """The active signature registry. Each takes (baseline, current) profiles.
+
+    The numeric distribution-shift threshold is the one continuously tunable knob
+    (used by the benchmark to trace the recall/false-positive operating curve);
+    the categorical signatures are fixed.
+    """
+    return [
+        detect_value_substitution,
+        detect_case_format_normalization,
+        detect_category_split_merge,
+        detect_unit_scale_shift,
+        lambda b, c: detect_numeric_distribution_shift(b, c, threshold=dist_threshold),
+    ]
 
 
 def _apply_precedence(symptoms: list):
@@ -57,17 +64,22 @@ def _apply_precedence(symptoms: list):
 
 
 def detect_symptoms(
-    before: pl.DataFrame, after: pl.DataFrame, columns: list[str] | None = None
+    before: pl.DataFrame,
+    after: pl.DataFrame,
+    columns: list[str] | None = None,
+    *,
+    dist_threshold: float = DEFAULT_DISTRIBUTION_THRESHOLD,
 ):
     """Profile the given columns before/after and run every active detector."""
     if columns is None:
         columns = [c for c in before.columns if c in after.columns]
 
+    detectors = _build_detectors(dist_threshold)
     symptoms = []
     for column in columns:
         baseline = profile_column(before[column].rename(column))
         current = profile_column(after[column].rename(column))
-        for detector in _DETECTORS:
+        for detector in detectors:
             symptom = detector(baseline, current)
             if symptom is not None:
                 symptoms.append(symptom)

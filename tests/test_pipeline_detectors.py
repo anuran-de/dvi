@@ -57,3 +57,16 @@ def test_behavioral_shift_still_reports_distribution_shift():
 
     assert "numeric_distribution_shift" in signatures
     assert "unit_scale_shift" not in signatures
+
+
+def test_distribution_threshold_is_tunable_through_the_pipeline():
+    # A modest shape change: below a strict threshold it stays a non-event, above
+    # a loose one it fires. (Spread widens ~1.5x, median stable — not affine.)
+    before = pl.DataFrame({"amount": [50.0] * 60 + [40.0] * 20 + [60.0] * 20})
+    after = pl.DataFrame({"amount": [50.0] * 60 + [34.0] * 20 + [66.0] * 20})
+
+    strict = detect_symptoms(before, after, columns=["amount"], dist_threshold=0.9)
+    loose = detect_symptoms(before, after, columns=["amount"], dist_threshold=0.05)
+
+    assert not any(s.signature == "numeric_distribution_shift" for s in strict)
+    assert any(s.signature == "numeric_distribution_shift" for s in loose)

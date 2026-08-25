@@ -50,3 +50,39 @@ def test_ignores_tiny_noise_values_below_threshold():
     current = _profile("country", {"US": 500, "UK": 499, "QQ": 1})
 
     assert detect_value_substitution(baseline, current) is None
+
+
+def test_tie_break_is_deterministic():
+    # Two equal-mass drops and two equal-mass gains: the chosen pair must be
+    # stable across runs (independent of set/hash iteration order).
+    baseline = _profile("country", {"AA": 250, "BB": 250, "US": 500})
+    current = _profile("country", {"XX": 250, "YY": 250, "US": 500})
+
+    symptom = detect_value_substitution(baseline, current)
+
+    assert symptom is not None
+    # Deterministic tie-break: lexicographically smallest drop, then smallest gain.
+    assert symptom.from_value == "AA"
+    assert symptom.to_value == "XX"
+
+
+def test_skips_high_cardinality_truncated_column():
+    # top_k covers only a small fraction of non-null rows (a long tail was
+    # truncated), so a value falling out of top_k would look like a phantom drop.
+    # Value substitution is not trustworthy here and must not fire.
+    baseline = ColumnProfile(
+        name="user_id",
+        row_count=1000,
+        null_count=0,
+        distinct_count=900,
+        top_k={"UK": 200},  # covers 20% of rows; the rest is an untracked tail
+    )
+    current = ColumnProfile(
+        name="user_id",
+        row_count=1000,
+        null_count=0,
+        distinct_count=900,
+        top_k={"United Kingdom": 200},
+    )
+
+    assert detect_value_substitution(baseline, current) is None

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dvi.profiling import ColumnProfile
 
+from .significance import noise_threshold
 from .symptom import Symptom
 
 # A value must hold at least this share to be considered a real category
@@ -48,6 +49,7 @@ def detect_value_substitution(
         return None
 
     values = set(baseline.top_k) | set(current.top_k)
+    na, nb = baseline.non_null_count, current.non_null_count
 
     dropped: list[tuple[str, float]] = []
     gained: list[tuple[str, float]] = []
@@ -55,9 +57,14 @@ def detect_value_substitution(
         base_share = baseline.value_share(value)
         curr_share = current.value_share(value)
         delta = curr_share - base_share
-        if delta <= -MIN_SHIFT and base_share >= MIN_SHARE:
+        # A share move counts only if it clears both the fixed relevance floor
+        # and the sample-size-aware noise floor (a small move on few rows is
+        # indistinguishable from sampling noise; the same move on many rows is
+        # real). p_pooled uses the two shares' midpoint.
+        shift_floor = max(MIN_SHIFT, noise_threshold((base_share + curr_share) / 2.0, na, nb))
+        if delta <= -shift_floor and base_share >= MIN_SHARE:
             dropped.append((value, -delta))
-        elif delta >= MIN_SHIFT and curr_share >= MIN_SHARE:
+        elif delta >= shift_floor and curr_share >= MIN_SHARE:
             gained.append((value, delta))
 
     if not dropped or not gained:

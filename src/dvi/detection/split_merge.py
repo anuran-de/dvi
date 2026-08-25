@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dvi.profiling import ColumnProfile
 
+from .significance import noise_threshold
 from .symptom import Symptom
 
 MIN_SHARE = 0.03
@@ -39,15 +40,20 @@ def detect_category_split_merge(
         return None
 
     values = set(baseline.top_k) | set(current.top_k)
+    na, nb = baseline.non_null_count, current.non_null_count
     dropped: list[tuple[str, float]] = []
     gained: list[tuple[str, float]] = []
     for value in values:
         base_share = baseline.value_share(value)
         curr_share = current.value_share(value)
         delta = curr_share - base_share
-        if delta <= -MIN_SHIFT and base_share >= MIN_SHARE:
+        # Sample-size-aware floor: a share move must clear sampling noise, not
+        # just the fixed relevance floor. Each split fragment is checked on its
+        # own, so noise-sized fragments never fabricate a split.
+        shift_floor = max(MIN_SHIFT, noise_threshold((base_share + curr_share) / 2.0, na, nb))
+        if delta <= -shift_floor and base_share >= MIN_SHARE:
             dropped.append((value, -delta))
-        elif delta >= MIN_SHIFT and curr_share >= MIN_SHARE:
+        elif delta >= shift_floor and curr_share >= MIN_SHARE:
             gained.append((value, delta))
 
     if len(dropped) == 1 and len(gained) >= 2:

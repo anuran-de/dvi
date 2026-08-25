@@ -26,3 +26,12 @@ change is detected, attributed to a deploy, and scoped downstream.
 - **demo** — `scripts/demo.py`: the "silent rename" scenario, end to end.
 
 24 tests, all green.
+
+### Hardening
+
+- **detection** — deterministic lexicographic tie-break for drop/gain matching
+  (results no longer depend on set/hash iteration order); high-cardinality guard
+  that skips columns whose top_k covers <90% of non-null rows.
+- **CI** — GitHub Actions across Python 3.11/3.12: ruff lint, pytest, a
+  second test pass under an alternate `PYTHONHASHSEED` (determinism guard), and
+  a job that runs the demo end to end. 26 tests.

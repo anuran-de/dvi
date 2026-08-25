@@ -87,12 +87,12 @@ Table snapshot (T1)          Table snapshot (T2)
 ```text
 src/dvi/
   profiling/    ColumnProfile + profiler over a Polars/DuckDB relation
-  detection/    change signatures #1-5 + Symptom
+  detection/    change signatures #1-5 + Symptom + significance guard
   lineage/      dbt manifest parsing → networkx graph
   rca/          corroboration + root-cause ranking      (M1 thin, M3 calibrated)
   incidents/    incident + evidence synthesis
   pipeline/     detector registry + precedence; analyze_change orchestration
-  benchmark/    synthetic data, labelled scenarios, evaluation runner
+  benchmark/    synthetic scenarios, evaluation runner, real-data validation
 ```
 
 ## 6. Benchmark and operating point
@@ -111,6 +111,31 @@ shipped default the detectors reach 100% recall at 0% false positives; the curve
 makes the trade-off — noise below t≈0.08, missed shifts above t≈0.43 — explicit
 and measured rather than asserted. The categorical signatures are effectively
 fixed; only the numeric detector is threshold-tunable in v1.
+
+### 6.1 Real-data validation and the significance guard
+
+A synthetic suite can flatter its own detector, so `dvi.benchmark.real_data`
+validates against a real public dataset (diamonds, 53,940 rows, bundled for
+offline CI). The decisive experiment is the inverse of recall: split the data into
+two **disjoint samples of the same distribution** and confirm no detector fires —
+every symptom there is a false positive.
+
+The first run failed loudly, and that failure shaped the design. The share-based
+signatures used a flat share-shift floor (`MIN_SHIFT`), which cannot tell a real
+relocation from sampling noise: a 3-point move is signal at 250k rows and noise at
+250. The synthetic "0% false positives" was an artifact of exact counts and large
+n. The fix is a **sample-size-aware significance guard** (`detection.significance`):
+a share move counts only if it clears `Z·√(p(1-p)(1/n_a+1/n_b))`, the two-proportion
+sampling error, with `Z=3` (three-sigma). The per-value floor becomes
+`max(MIN_SHIFT, noise_threshold(...))`. A parallel fix replaced the unit/scale
+detector's joint slope+intercept fit — unstable on a narrow-spread column far from
+zero — with two independent single-parameter hypotheses (multiplicative through the
+origin; additive with slope fixed at 1).
+
+Result: at n=1000 across 30 disjoint splits, **0 real-vs-real false positives**
+(down from ~100% of splits) and **100% recall** of a planted category rename.
+Residual false positives survive only at n≤500 and vanish by n=1000 — measured,
+not hidden.
 
 ## 5. Decisions log
 

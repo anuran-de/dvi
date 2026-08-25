@@ -51,7 +51,9 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
-> **M2 — the signature taxonomy + benchmark: complete.** All five flagship signatures are implemented, wired with precedence rules, and measured against a labelled benchmark. On a suite of one clean positive per signature plus normal-variation negatives and benign decoys, DVI hits **100% recall at a 0% false-positive rate** at the shipped operating point, and ranks the true root cause **#1 under concurrent distractor deploys** on every RCA case. 60 tests, all green.
+> **M2 — the signature taxonomy + benchmark: complete.** All five flagship signatures are implemented, wired with precedence rules, and measured against a labelled benchmark. On a suite of one clean positive per signature plus normal-variation negatives and benign decoys, DVI hits **100% recall at a 0% false-positive rate** at the shipped operating point, and ranks the true root cause **#1 under concurrent distractor deploys** on every RCA case.
+>
+> **Validated on real data.** The synthetic suite is not enough on its own — so DVI is now validated against a real public dataset (53,940 rows). Running two disjoint halves of the *same* distribution through the detectors produces **0 false positives at n≥1000**, while a planted semantic change is recovered at **100% recall**. This exposed and fixed a real robustness gap (see [Validated on real data](#validated-on-real-data)). 72 tests, all green.
 >
 > **M1 — walking skeleton: complete.** The thinnest end-to-end path proving the core hypothesis: profile → temporal snapshots → detector → dbt lineage → corroboration → ranked root cause with evidence, on synthetic data.
 
@@ -128,6 +130,22 @@ The safe band `[0.08, 0.43)` gives full recall at zero false positives; push the
 
 The same runner scores **root-cause ranking under concurrency**: given a symptom and several near-simultaneous deploys, it checks the true cause ranks #1. Irrelevant deploys (no lineage path) and post-symptom changes are excluded outright; among genuine upstream candidates the closer-in-time / higher-coverage one wins. Top-1 accuracy is 100% across the RCA cases.
 
+### Validated on real data
+
+A synthetic benchmark can flatter its own detector. The real test of a change detector is the opposite of recall: **when nothing changed, does it stay silent?** So DVI is validated against a real public dataset — the classic [diamonds](data/README.md) set, 53,940 rows, bundled so the check runs offline in CI.
+
+The experiment: split the data into two **disjoint samples of the same distribution** and run every detector. Nothing changed between them, so every symptom is a false positive.
+
+This is where the honest story is. The *first* run of that experiment false-fired on nearly every split — the synthetic "0% false positives" was an artifact of exact counts and huge sample sizes. A share moving 3 points is a real event at 250k rows and pure sampling noise at 250. The fix is a **sample-size-aware significance guard**: a share move counts only if it clears the sampling noise `Z·√(p(1-p)(1/n_a+1/n_b))` (Z=3, three-sigma). A parallel fix stabilised the unit/scale detector, which was turning quantile jitter on a narrow-spread column into a phantom offset.
+
+```text
+  Validation on real data (diamonds, 53,940 rows)
+  Real-vs-real false positives: 0/210 column-checks fire (0%) across 30 disjoint splits
+  Injected-rename recall       : 30/30 (100%) - a planted category rename recovered under real noise
+```
+
+Two disjoint samples of the same distribution stay **silent**; a real injected change is still **caught**. Residual false positives exist only at very small samples (~1% at n=250) and vanish by n=1000 — and that trade-off is measured, not hidden.
+
 ## Roadmap
 
 DVI is built as a **walking skeleton** — the riskiest, most novel part (does semantic detection + causal ranking actually work?) is proven first; UI and connectors come last.
@@ -135,7 +153,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 | Milestone | Adds | Proves |
 |-----------|------|--------|
 | **M1** ✅ | Value-substitution signature end-to-end on synthetic data | The core hypothesis is alive |
-| **M2** ✅ | Signatures 2–5 + negatives/decoys benchmark | 100% recall at 0% false positives on the suite |
+| **M2** ✅ | Signatures 2–5 + negatives/decoys benchmark + real-data validation | Full recall on the suite; **0 false positives on real same-distribution data** |
 | **M3** | Calibrated logistic confidence + reliability diagram | Honest, *measured* confidence |
 | **M4** | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
 | **M5** | Snowflake pushdown profiling + CLI / GitHub Action PR reports | Real-user adoption path |

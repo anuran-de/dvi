@@ -5,6 +5,34 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Real-data validation + significance guards
+
+Validating the detectors on a real public dataset (the classic **diamonds** set,
+53,940 rows) exposed a robustness gap the synthetic suite hid: running two random
+halves of the *same* distribution through the share-based detectors false-fired on
+nearly every split at small sample sizes. The synthetic "0% false positives" was an
+artifact of exact counts and large n. This change closes the gap.
+
+- **detection (significance)** — `significance.noise_threshold`: a share move now
+  counts only if it clears the two-proportion sampling noise `Z·√(p(1-p)(1/na+1/nb))`
+  (Z=3.0, three-sigma). Wired into `value_substitution` and `category_split_merge`
+  as `max(MIN_SHIFT, noise_threshold(...))`. The same share move is noise at small
+  n and signal at large n.
+- **detection (unit/scale)** — replaced the joint slope+intercept affine fit, which
+  turned quantile jitter on a narrow-spread column (a percentage near 61) into a
+  bogus "+4 offset", with two independent single-parameter hypotheses: multiplicative
+  (spread ratio, through origin) and additive (median shift, slope fixed at 1). A
+  no-op scale reads as factor≈1; a no-op shift reads as offset≈0.
+- **benchmark (real data)** — `dvi.benchmark.real_data`: `load_diamonds`,
+  `two_sample_splits`, `real_vs_real_report`, `injected_recall_report`,
+  `evaluate_real_data`. The diamonds parquet is bundled (~0.5 MB) so CI runs offline.
+- **result** — at n=1000 across 30 disjoint splits: **0/210 real-vs-real false
+  positives** (down from ~100% of splits before the guards) and **100% recall** of a
+  planted category rename. Residual false positives appear only at n≤500 (~1% at
+  n=250) and vanish by n=1000 — measured, not hidden.
+
+72 tests, all green. CI runs the real-data validation end to end.
+
 ### M2 — Signature taxonomy + benchmark (complete)
 
 The full flagship signature set, plus a labelled benchmark that measures recall

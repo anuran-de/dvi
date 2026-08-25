@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="#status"><img alt="status" src="https://img.shields.io/badge/status-M1%20walking%20skeleton-blue"></a>
+  <a href="#status"><img alt="status" src="https://img.shields.io/badge/status-M1%20complete-brightgreen"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-green"></a>
   <img alt="python" src="https://img.shields.io/badge/python-3.11%2B-blue">
 </p>
@@ -50,9 +50,43 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
-> **M1 — walking skeleton.** The thinnest end-to-end path that proves the core hypothesis: profile → temporal snapshots → value-substitution detector → dbt lineage → corroboration → ranked root cause with evidence, on synthetic data.
+> **M1 — walking skeleton: complete.** The thinnest end-to-end path that proves the core hypothesis works: profile → temporal snapshots → value-substitution detector → dbt lineage → corroboration → ranked root cause with evidence, on synthetic data. 24 tests, all green.
 
 See the [roadmap](#roadmap) for what each milestone adds and what is explicitly *not built yet*.
+
+## See it work
+
+```bash
+python scripts/demo.py
+```
+
+A deploy silently renames `"UK"` → `"United Kingdom"`. Every structural check stays green; DVI still catches it, attributes it, and scopes the blast radius:
+
+```text
+  Structural checks: schema OK | row_count OK | freshness OK | nulls OK
+
+  DATA INCIDENT
+  Severity    : HIGH
+  Change at   : 09:14
+  Detected at : 09:16
+
+  Suspected data incident from change 'deploy #482 (country normalization)'.
+  Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom'
+  (20.0%) on model.shop.fact_orders; 3 downstream asset(s) affected.
+
+  Affected downstream assets:
+    - model.shop.exec_dashboard
+    - model.shop.ml_ltv_feature
+    - model.shop.revenue_daily
+
+  Evidence:
+    * Change 'deploy #482 ...' was deployed 2 min before the first symptom.
+    * 'deploy #482 ...' directly changed model.shop.fact_orders, where DVI
+      observed: Value 'UK' (20.0%) appears replaced by 'United Kingdom' (20.0%).
+    * No corresponding change was observed upstream of the targeted asset(s).
+```
+
+Note what DVI does **not** do: it prints no fabricated "92% confidence". It shows the ranked cause and the observable evidence. Calibrated, *measured* confidence arrives in M3.
 
 ## Roadmap
 
@@ -60,7 +94,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 
 | Milestone | Adds | Proves |
 |-----------|------|--------|
-| **M1** | Value-substitution signature end-to-end on synthetic data | The core hypothesis is alive |
+| **M1** ✅ | Value-substitution signature end-to-end on synthetic data | The core hypothesis is alive |
 | **M2** | Signatures 2–5 + negatives/decoys/concurrency benchmark | Recall at a fixed false-positive budget |
 | **M3** | Calibrated logistic confidence + reliability diagram | Honest, *measured* confidence |
 | **M4** | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |

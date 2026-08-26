@@ -46,14 +46,16 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 - **Integrate, don't replace.** Reuse dbt's lineage, your warehouse, DuckDB, `sqlglot`. Build only the intelligence layer from scratch.
 - **Deterministic first.** Detection and ranking are deterministic and explainable. An LLM, if used at all, only *narrates* evidence — it never decides whether something changed.
 - **Evidence before explanation.** Every root-cause claim carries the observable facts that support it.
-- **Honest confidence.** No hand-tuned "92%". Confidence is either omitted (rank + evidence) or *calibrated and measured on held-out incidents* (roadmap M3).
+- **Honest confidence.** No hand-tuned "92%". Confidence is either omitted (rank + evidence) or *calibrated and measured on held-out data* — a logistic model whose out-of-fold reliability is reported (ECE 0.04), not asserted.
 - **Symptom ≠ incident.** Corroboration (time × deployment × downstream propagation) is required before anything pages a human — this is how false positives stay low.
 
 ## Status
 
+> **M3 — calibrated confidence: complete.** Each fired symptom now carries a *measured* probability that it is a real change, from a pure-Python logistic model over four uniform features (magnitude, significance margin, coverage, log10 sample size). Calibration is proven, not asserted: on a labelled dataset of real injections, small-`n` hard negatives and synthetic scenarios, the **out-of-fold** (k-fold) reliability gives **ECE 0.04 / Brier 0.005**. The coefficients are frozen to JSON and shipped; inference needs no training data.
+>
 > **M2 — the signature taxonomy + benchmark: complete.** All five flagship signatures are implemented, wired with precedence rules, and measured against a labelled benchmark. On a suite of one clean positive per signature plus normal-variation negatives and benign decoys, DVI hits **100% recall at a 0% false-positive rate** at the shipped operating point, and ranks the true root cause **#1 under concurrent distractor deploys** on every RCA case.
 >
-> **Validated on real data.** The synthetic suite is not enough on its own — so DVI is now validated against a real public dataset (53,940 rows). Running two disjoint halves of the *same* distribution through the detectors produces **0 false positives at n≥1000**, while a planted semantic change is recovered at **100% recall**. This exposed and fixed a real robustness gap (see [Validated on real data](#validated-on-real-data)). 72 tests, all green.
+> **Validated on real data.** The synthetic suite is not enough on its own — so DVI is now validated against a real public dataset (53,940 rows). Running two disjoint halves of the *same* distribution through the detectors produces **0 false positives at n≥1000**, while a planted semantic change is recovered at **100% recall**. This exposed and fixed a real robustness gap (see [Validated on real data](#validated-on-real-data)). 103 tests, all green.
 >
 > **M1 — walking skeleton: complete.** The thinnest end-to-end path proving the core hypothesis: profile → temporal snapshots → detector → dbt lineage → corroboration → ranked root cause with evidence, on synthetic data.
 
@@ -86,6 +88,7 @@ A deploy silently renames `"UK"` → `"United Kingdom"`. Every structural check 
   Severity    : HIGH
   Change at   : 09:14
   Detected at : 09:16
+  Confidence  : 94% (calibrated, out-of-fold ECE 0.04)
 
   Suspected data incident from change 'deploy #482 (country normalization)'.
   Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom'
@@ -103,7 +106,7 @@ A deploy silently renames `"UK"` → `"United Kingdom"`. Every structural check 
     * No corresponding change was observed upstream of the targeted asset(s).
 ```
 
-Note what DVI does **not** do: it prints no fabricated "92% confidence". It shows the ranked cause and the observable evidence. Calibrated, *measured* confidence arrives in M3.
+Note what DVI does **not** do: it prints no fabricated "92% confidence". The confidence it *does* show is a calibrated probability from a logistic model, whose out-of-fold reliability (ECE 0.04) is reported alongside — the number means what it says, and drops on weaker evidence.
 
 ### The benchmark
 
@@ -146,6 +149,25 @@ This is where the honest story is. The *first* run of that experiment false-fire
 
 Two disjoint samples of the same distribution stay **silent**; a real injected change is still **caught**. Residual false positives exist only at very small samples (~1% at n=250) and vanish by n=1000 — and that trade-off is measured, not hidden.
 
+### Calibrated confidence (M3)
+
+A detector firing is one thing; *how sure* should you be it's real? DVI attaches a **calibrated probability** to every fired symptom — the measured chance it is a genuine change rather than sampling noise. The point of "calibrated" is literal: when the model says 0.7, about 70% of such symptoms are real, and we prove it on held-out data instead of hand-tuning a number.
+
+The model is a small pure-Python logistic regression (no numpy/sklearn in the stack) over four uniform features: the detector's `magnitude`, a `significance_margin` (effect size in multiples of its noise/threshold floor), top-`k` `coverage`, and `log10` of the sample size. It is trained on a labelled dataset that deliberately spans the hard regime — real category renames injected into diamonds samples across a grid of size and rename fraction (the *borderline* positives), plus **small-`n` real-vs-real splits** where noise occasionally slips past the guards (the hard negatives), plus the synthetic scenarios for multi-signature coverage.
+
+Honesty comes from **k-fold cross-validation**: every row is scored by a model that never trained on it, and those out-of-fold predictions produce the reliability table below. The shipped model is then refit on all the data and its coefficients frozen to JSON, so inference needs no training data.
+
+```text
+  Calibrated confidence (per-symptom, k-fold cross-validated)
+  Dataset: 80 fired symptoms, 35 real (44% positive)
+  Out-of-fold ECE: 0.0447   Brier: 0.0050
+  | bin      |  n | predicted | empirical | gap   |
+  | 0.0-0.1  | 41 |   0.027   |   0.000   | 0.027 |
+  | 0.9-1.0  | 29 |   0.974   |   1.000   | 0.026 |   (middle bins sparse; see benchmark)
+```
+
+Confidence is conditional on firing, so predictions skew to the extremes — most fired symptoms are clearly real or clearly noise — and the reliability table prints per-bin counts so the sparse middle stays visible rather than hidden by a smooth curve. Run `python scripts/benchmark.py` for the full table.
+
 ## Roadmap
 
 DVI is built as a **walking skeleton** — the riskiest, most novel part (does semantic detection + causal ranking actually work?) is proven first; UI and connectors come last.
@@ -154,7 +176,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 |-----------|------|--------|
 | **M1** ✅ | Value-substitution signature end-to-end on synthetic data | The core hypothesis is alive |
 | **M2** ✅ | Signatures 2–5 + negatives/decoys benchmark + real-data validation | Full recall on the suite; **0 false positives on real same-distribution data** |
-| **M3** | Calibrated logistic confidence + reliability diagram | Honest, *measured* confidence |
+| **M3** ✅ | Calibrated logistic confidence + out-of-fold reliability table | Honest, *measured* confidence (ECE 0.04) |
 | **M4** | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
 | **M5** | Snowflake pushdown profiling + CLI / GitHub Action PR reports | Real-user adoption path |
 | **M6** | Production-grade web UI + incident timeline | Operator experience |

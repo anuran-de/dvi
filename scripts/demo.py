@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from dvi.benchmark import inject_value_substitution, make_orders
+from dvi.calibration import load_model
 from dvi.lineage import LineageGraph
 from dvi.pipeline import analyze_change
 from dvi.rca import ChangeEvent
@@ -47,6 +48,7 @@ def main() -> None:
         lineage=build_lineage(),
         changes=[deploy],
         columns=["country"],
+        model=load_model(),
     )
 
     print("=" * 68)
@@ -62,6 +64,8 @@ def main() -> None:
     print(f"  Severity    : {incident.severity.upper()}")
     print(f"  Change at   : {incident.change_at:%H:%M}")
     print(f"  Detected at : {incident.detected_at:%H:%M}")
+    if incident.confidence is not None:
+        print(f"  Confidence  : {incident.confidence:.0%} (calibrated, out-of-fold ECE 0.04)")
     print(f"\n  {incident.summary}")
     print("\n  Affected downstream assets:")
     for asset in sorted(incident.affected_assets):

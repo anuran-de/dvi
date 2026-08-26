@@ -5,6 +5,39 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M3 — Calibrated confidence (complete)
+
+Each fired symptom now carries a *measured* probability that it is a real change,
+rather than a hand-tuned number. Calibration is proven on held-out data.
+
+- **calibration (model)** — `LogisticModel`: a pure-Python logistic regression
+  (no numpy/scipy/sklearn in the stack) fit by deterministic batch gradient descent
+  with L2, standardizing features internally and round-tripping to JSON.
+- **calibration (features)** — `extract_features`: the uniform 4-feature vector
+  `magnitude`, `significance_margin` (effect size in multiples of its noise/threshold
+  floor, branching per signature), `coverage`, `log10(min(na, nb))`.
+- **calibration (dataset)** — `build_calibration_dataset`: labelled data mixing real
+  injected renames over a size×fraction grid (borderline positives), small-`n`
+  real-vs-real splits (hard negatives where noise leaks past the guards), and the
+  synthetic scenarios (multi-signature coverage). Fully seeded.
+- **calibration (reliability)** — `k_fold_predictions`, `reliability_table`,
+  `expected_calibration_error`, `brier_score`, `render_reliability`: honesty via
+  out-of-fold predictions; a text/markdown reliability table with per-bin counts
+  (no plotting library available).
+- **calibration (freezing)** — `build_coefficients` / `load_model`: the final model
+  is refit on all data and frozen to `coefficients.json` (shipped as package data);
+  a regression test re-fits and asserts the coefficients match and held-out ECE/Brier
+  stay within bounds.
+- **wiring** — `Symptom.confidence` (default `None` keeps M1/M2 behavior),
+  `score_symptom` / `attach_confidence`, an optional `model=` on `detect_symptoms`
+  and `analyze_change`, and `Incident.confidence` surfacing the primary symptom's
+  score. The demo prints a calibrated confidence line.
+- **result** — out-of-fold **ECE 0.045 / Brier 0.005** on 80 fired symptoms
+  (44% positive). Confidence is conditional on firing, so predictions skew to the
+  extremes; sparse middle bins stay visible in the per-bin table.
+
+103 tests, all green. The benchmark prints the calibration section end to end.
+
 ### Real-data validation + significance guards
 
 Validating the detectors on a real public dataset (the classic **diamonds** set,

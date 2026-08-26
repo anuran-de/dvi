@@ -88,9 +88,10 @@ Table snapshot (T1)          Table snapshot (T2)
 src/dvi/
   profiling/    ColumnProfile + profiler over a Polars/DuckDB relation
   detection/    change signatures #1-5 + Symptom + significance guard
+  calibration/  per-symptom confidence: features, logistic model, reliability, frozen JSON
   lineage/      dbt manifest parsing → networkx graph
-  rca/          corroboration + root-cause ranking      (M1 thin, M3 calibrated)
-  incidents/    incident + evidence synthesis
+  rca/          corroboration + root-cause ranking
+  incidents/    incident + evidence synthesis (surfaces calibrated confidence)
   pipeline/     detector registry + precedence; analyze_change orchestration
   benchmark/    synthetic scenarios, evaluation runner, real-data validation
 ```
@@ -137,6 +138,53 @@ Result: at n=1000 across 30 disjoint splits, **0 real-vs-real false positives**
 Residual false positives survive only at n≤500 and vanish by n=1000 — measured,
 not hidden.
 
+## 7. Calibrated confidence (M3)
+
+The detectors are deterministic and decide *whether* a symptom fires. The
+`calibration/` layer adds *how confident* we are it is real — a probability that
+means what it says. It is deliberately kept separate: detection semantics never
+depend on the model, and passing no model reproduces exact M1/M2 behavior.
+
+**Feature vector** (`features.extract_features`) — four uniform features per fired
+symptom: `magnitude` (the detector's effect size), `significance_margin` (that
+effect in multiples of its noise/threshold floor; the only feature that branches
+by signature — share noise for categorical, the shift threshold for numeric, the
+fit tolerance for unit/scale), top-`k` `coverage`, and `log10(min(na, nb))`.
+Features are standardized inside the model.
+
+**Model** (`model.LogisticModel`) — a from-scratch logistic regression, because
+numpy/scipy/sklearn are not in the stack. Deterministic batch gradient descent
+(zero init, fixed iterations, no shuffling) with L2 that shrinks weights but not
+the intercept, so a fit is reproducible and freezable.
+
+**Dataset** (`dataset.build_calibration_dataset`) — the calibration data has to
+cover the *hard* regime, or the reliability curve only sees easy extremes. So it
+mixes real category renames injected across a size×fraction grid (borderline
+positives), **small-`n` real-vs-real splits** where noise leaks past the guards
+(hard negatives), and the synthetic scenarios (numeric/unit positives the
+categorical grid can't provide). Everything is seeded and derived from profiles.
+
+**Honesty** (`reliability`) — calibration quality is measured on **out-of-fold**
+predictions via k-fold CV (`index % k`): each row is scored by a model that never
+trained on it. From those pooled `(prob, label)` pairs we build an equal-width
+reliability table (per-bin count, mean predicted, empirical frequency), the
+Expected Calibration Error and the Brier score. No plotting library is available,
+so the "diagram" is a markdown table with visible per-bin counts. Measured:
+**ECE 0.045 / Brier 0.005**.
+
+**Freezing** (`loader`) — the shipped model is refit on all the data and frozen to
+`coefficients.json` (weights, intercept, feature scaling, feature order, and the
+measured k-fold ECE/Brier as metadata), loaded via `importlib.resources`.
+Inference needs no training data. A regression test re-fits from the seeded
+generators and asserts the coefficients match and held-out ECE/Brier stay within
+bounds — a de-calibrating change fails CI.
+
+**Wiring** — `Symptom.confidence` defaults to `None`; `detect_symptoms` and
+`analyze_change` take an optional `model=`; when supplied, each surviving symptom
+is scored (`score.attach_confidence`) and `Incident.confidence` surfaces the
+primary symptom's probability. Confidence is *conditional on firing*, so scores
+skew to the extremes and production `n` pushes real confidences high.
+
 ## 5. Decisions log
 
 - **Wedge, not platform.** Ship semantic/behavioral change detection deep; treat
@@ -145,5 +193,10 @@ not hidden.
 - **A-now / sketch-later data access.** M1 stores real top-K values (synthetic
   data, no privacy issue) to *name* changes in reports; a sketch-only mode is a
   planned drop-in for real deployments.
-- **Confidence is measured, not asserted.** Rank + evidence now; calibrated
-  logistic confidence with a reliability diagram in M3.
+- **Confidence is measured, not asserted.** A per-symptom logistic model whose
+  out-of-fold reliability (ECE/Brier) is reported, not a hand-tuned percentage.
+  Calibration lives in a separate layer so detection stays deterministic and
+  passing no model reproduces exact M1/M2 behavior.
+- **Calibrate on the hard regime.** The labelled dataset over-samples borderline
+  cases (small-`n` renames, noise that leaks past the guards) on purpose — a
+  reliability curve built only from easy extremes proves nothing.

@@ -54,10 +54,10 @@ def _substitution_features(n: int):
     return extract_features(symptom, baseline, current)
 
 
-def test_feature_vector_has_the_four_named_features_in_order():
+def test_feature_vector_has_the_three_named_features_in_order():
     fv = _substitution_features(1000)
-    assert FEATURE_NAMES == ["magnitude", "significance_margin", "coverage", "log10_n"]
-    assert fv.as_list() == [fv.magnitude, fv.significance_margin, fv.coverage, fv.log10_n]
+    assert FEATURE_NAMES == ["magnitude", "significance_margin", "log10_n"]
+    assert fv.as_list() == [fv.magnitude, fv.significance_margin, fv.log10_n]
 
 
 def test_substitution_features_are_sensible():
@@ -66,8 +66,6 @@ def test_substitution_features_are_sensible():
     assert 0.15 <= fv.magnitude <= 0.25
     # A clean 20-point move on 1000 rows is far above sampling noise.
     assert fv.significance_margin > 1.0
-    # Categorical top_k covers all rows here.
-    assert abs(fv.coverage - 1.0) < 1e-9
     # log10(1000) == 3.
     assert abs(fv.log10_n - 3.0) < 1e-9
 
@@ -79,15 +77,13 @@ def test_significance_margin_grows_with_sample_size():
     assert large.significance_margin > small.significance_margin
 
 
-def test_numeric_features_use_unit_coverage_and_threshold_margin():
+def test_numeric_features_use_threshold_margin():
     baseline = _num("amount", {"p05": 10, "p25": 20, "p50": 30, "p75": 40, "p95": 50})
     current = _num("amount", {"p05": 20, "p25": 30, "p50": 40, "p75": 50, "p95": 60})
     symptom = detect_numeric_distribution_shift(baseline, current)
     assert symptom is not None
 
     fv = extract_features(symptom, baseline, current)
-    # Numeric columns have no top_k; coverage is not meaningful -> 1.0.
-    assert abs(fv.coverage - 1.0) < 1e-9
     # A +10 shift on a 40-wide spread is well beyond the 0.10 threshold.
     assert fv.significance_margin > 1.0
     assert not math.isnan(fv.significance_margin)

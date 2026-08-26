@@ -1,10 +1,14 @@
-"""Turn a fired symptom into the 4-feature vector the confidence model scores.
+"""Turn a fired symptom into the 3-feature vector the confidence model scores.
 
-The features are deliberately minimal and uniform (design decision: "minimal
-uniform 4"). Three are computed identically for every signature; only
-``significance_margin`` branches, because "how far past the noise floor" means
-something different for a categorical share move, a numeric quantile shift, and a
-unit/scale refit.
+The features are deliberately minimal and uniform. ``magnitude`` and ``log10_n``
+are computed identically for every signature; only ``significance_margin``
+branches, because "how far past the noise floor" means something different for a
+categorical share move, a numeric quantile shift, and a unit/scale refit.
+
+(A ``coverage`` feature was dropped: every fired categorical symptom already
+clears the detectors' ``MIN_TOP_K_COVERAGE`` guard, so on the calibration set the
+value was a constant 1.0 with zero variance and a trained weight of exactly 0 — a
+dead input, not a signal. See docs/architecture.md §7.)
 
 Everything is derived from the two ``ColumnProfile`` objects the detector already
 saw, so the calibration layer never needs the raw data.
@@ -21,7 +25,7 @@ from ..detection.symptom import Symptom
 from ..detection.unit_scale_shift import ADD_TOLERANCE, MULT_TOLERANCE
 from ..profiling import ColumnProfile
 
-FEATURE_NAMES = ["magnitude", "significance_margin", "coverage", "log10_n"]
+FEATURE_NAMES = ["magnitude", "significance_margin", "log10_n"]
 
 # Categorical share signatures share one margin formula; numeric ones another.
 _CATEGORICAL_SIGNATURES = frozenset(
@@ -35,23 +39,14 @@ _MARGIN_CAP = 20.0
 
 @dataclass(frozen=True)
 class FeatureVector:
-    """The 4 features scored by the confidence model, in a fixed order."""
+    """The 3 features scored by the confidence model, in a fixed order."""
 
     magnitude: float
     significance_margin: float
-    coverage: float
     log10_n: float
 
     def as_list(self) -> list[float]:
-        return [self.magnitude, self.significance_margin, self.coverage, self.log10_n]
-
-
-def _top_k_coverage(profile: ColumnProfile) -> float:
-    """Fraction of non-null rows captured by the retained top_k values."""
-    non_null = profile.non_null_count
-    if non_null <= 0 or not profile.top_k:
-        return 0.0
-    return min(1.0, sum(profile.top_k.values()) / non_null)
+        return [self.magnitude, self.significance_margin, self.log10_n]
 
 
 def _significance_margin(
@@ -88,18 +83,10 @@ def extract_features(
     """Build the calibration feature vector for a fired symptom."""
     na = baseline.non_null_count
     nb = current.non_null_count
-
-    if symptom.signature in _CATEGORICAL_SIGNATURES:
-        coverage = min(_top_k_coverage(baseline), _top_k_coverage(current))
-    else:
-        # Numeric columns have no top_k; coverage is not meaningful there.
-        coverage = 1.0
-
     log10_n = math.log10(max(1, min(na, nb)))
 
     return FeatureVector(
         magnitude=symptom.magnitude,
         significance_margin=_significance_margin(symptom, baseline, current),
-        coverage=coverage,
         log10_n=log10_n,
     )

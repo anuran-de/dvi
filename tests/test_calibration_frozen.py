@@ -60,8 +60,9 @@ def test_intermediate_probabilities_are_not_claimed_as_calibrated():
 
 def test_model_scores_strong_change_above_borderline():
     model = load_model()
-    strong = model.predict_proba([[0.5, 15.0, 1.0, 3.5]])[0]
-    weak = model.predict_proba([[0.02, 0.5, 1.0, 2.0]])[0]
+    # [magnitude, significance_margin, log10_n]
+    strong = model.predict_proba([[0.5, 15.0, 3.5]])[0]
+    weak = model.predict_proba([[0.02, 0.5, 2.0]])[0]
     assert strong > 0.8
     assert weak < 0.3
     assert strong > weak

@@ -145,12 +145,15 @@ The detectors are deterministic and decide *whether* a symptom fires. The
 means what it says. It is deliberately kept separate: detection semantics never
 depend on the model, and passing no model reproduces exact M1/M2 behavior.
 
-**Feature vector** (`features.extract_features`) — four uniform features per fired
-symptom: `magnitude` (the detector's effect size), `significance_margin` (that
-effect in multiples of its noise/threshold floor; the only feature that branches
-by signature — share noise for categorical, the shift threshold for numeric, the
-fit tolerance for unit/scale), top-`k` `coverage`, and `log10(min(na, nb))`.
-Features are standardized inside the model.
+**Feature vector** (`features.extract_features`) — three uniform features per
+fired symptom: `magnitude` (the detector's effect size), `significance_margin`
+(that effect in multiples of its noise/threshold floor; the only feature that
+branches by signature — share noise for categorical, the shift threshold for
+numeric, the fit tolerance for unit/scale), and `log10(min(na, nb))`. Features are
+standardized inside the model. (A `coverage` feature was removed in M3.1: every
+fired categorical symptom already clears the detectors' `MIN_TOP_K_COVERAGE`
+guard, so it was a constant 1.0 with zero variance and a trained weight of exactly
+0 — a dead input. Dropping it left every prediction unchanged.)
 
 **Model** (`model.LogisticModel`) — a from-scratch logistic regression, because
 numpy/scipy/sklearn are not in the stack. Deterministic batch gradient descent

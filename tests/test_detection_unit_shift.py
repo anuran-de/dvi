@@ -68,6 +68,17 @@ def test_near_identical_offset_distribution_is_not_a_unit_shift():
     assert detect_unit_scale_shift(baseline, current) is None
 
 
+def test_narrow_spread_far_from_zero_additive_drift_is_not_a_unit_shift():
+    # A column pinned at ~61 with a spread of 0.04. A rigid +0.02 drift makes
+    # abs(offset)/base_scale = 0.5 -> the additive test fires magnitude 0.5, but a
+    # 0.02 move on values around 61 (0.03%) is jitter, not a unit re-encoding. The
+    # near-constant column is effectively scale-free; #5 must not fire.
+    base_qs = {"p05": 60.98, "p25": 60.99, "p50": 61.00, "p75": 61.01, "p95": 61.02}
+    current_qs = {k: v + 0.02 for k, v in base_qs.items()}
+
+    assert detect_unit_scale_shift(_num("depth", base_qs), _num("depth", current_qs)) is None
+
+
 def test_returns_none_for_non_numeric():
     cat = ColumnProfile(
         name="country", row_count=10, null_count=0, distinct_count=2, top_k={"UK": 6, "US": 4}

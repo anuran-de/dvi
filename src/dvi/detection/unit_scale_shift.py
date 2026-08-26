@@ -44,6 +44,13 @@ FIT_TOLERANCE = 0.05
 MULT_TOLERANCE = 0.2
 # Intercept, relative to the baseline spread, to count as a real offset.
 ADD_TOLERANCE = 0.2
+# A column whose spread is below this fraction of where it sits (|median|, floored
+# at 1) is effectively constant: the additive test divides the offset by that tiny
+# spread, so sub-percent jitter on a value pinned at ~61 clears ADD_TOLERANCE and
+# fires a bogus "offset". Real re-encoded columns keep their spread, so this only
+# suppresses the near-constant degenerate case; any genuine large move there is
+# still caught by #4 (whose own spread floor is 1e-4, well below this).
+NARROW_SPREAD_FLOOR = 1e-3
 
 
 def detect_unit_scale_shift(
@@ -60,6 +67,12 @@ def detect_unit_scale_shift(
     base_scale = b.quantiles["p95"] - b.quantiles["p05"]
     curr_scale = c.quantiles["p95"] - c.quantiles["p05"]
     if base_scale <= 0 or curr_scale <= 0:
+        return None
+
+    # Effectively-constant column far from zero: spread is negligible next to where
+    # the column lives, so the affine fit is dominated by jitter. Don't fire.
+    location = max(abs(b.quantiles["p50"]), 1.0)
+    if base_scale < NARROW_SPREAD_FLOOR * location:
         return None
 
     # Multiplicative hypothesis: current = factor * baseline (through the origin).

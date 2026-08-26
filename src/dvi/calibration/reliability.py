@@ -72,6 +72,24 @@ def assign_folds(n: int, k: int) -> list[int]:
     return [i % k for i in range(n)]
 
 
+def assign_stratified_folds(labels: list[int], k: int) -> list[int]:
+    """Deterministic, label-stratified fold id per row.
+
+    Plain ``index % k`` can pile one class into a single fold, leaving that fold's
+    training complement single-class (a model fit on one class scores every
+    held-out row of the other class as garbage). Assigning each class round-robin
+    across folds in index order keeps both classes in every fold — so no training
+    complement is single-class — while staying fully deterministic.
+    """
+    folds = [0] * len(labels)
+    seen: dict[int, int] = {}
+    for i, label in enumerate(labels):
+        rank = seen.get(label, 0)
+        folds[i] = rank % k
+        seen[label] = rank + 1
+    return folds
+
+
 def brier_score(pairs: list[Pair]) -> float:
     """Mean squared error between predicted probability and outcome."""
     if not pairs:
@@ -145,15 +163,20 @@ def k_fold_predictions(
     scored by that model — so no row is ever scored by a model that trained on it.
     """
     n = len(dataset)
-    folds = assign_folds(n, k)
     X = [s.features.as_list() for s in dataset]
     y = [s.label for s in dataset]
+    folds = assign_stratified_folds(y, k)
 
     predictions: list[Pair | None] = [None] * n
     for f in range(k):
         train = [i for i in range(n) if folds[i] != f]
         test = [i for i in range(n) if folds[i] == f]
         if not test or not train:
+            continue
+        # A single-class training fold cannot calibrate the other class; skip it
+        # rather than emit garbage out-of-fold predictions. Stratification makes
+        # this a safety net (it only triggers if a whole class is tiny).
+        if len({y[i] for i in train}) < 2:
             continue
         model = LogisticModel.fit(
             [X[i] for i in train], [y[i] for i in train], l2=l2, lr=lr, iters=iters

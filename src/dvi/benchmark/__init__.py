@@ -1,5 +1,12 @@
 """Benchmark: synthetic data and controlled failure injection with ground truth."""
 
+from .blast_radius import (
+    BlastRadiusCase,
+    BlastRadiusCaseResult,
+    BlastRadiusReport,
+    build_blast_radius_cases,
+    evaluate_blast_radius,
+)
 from .evaluate import (
     BenchmarkReport,
     OperatingPoint,
@@ -33,6 +40,9 @@ from .synthetic import (
 
 __all__ = [
     "BenchmarkReport",
+    "BlastRadiusCase",
+    "BlastRadiusCaseResult",
+    "BlastRadiusReport",
     "OperatingPoint",
     "RcaCase",
     "RcaCaseResult",
@@ -42,10 +52,12 @@ __all__ = [
     "RealRecallReport",
     "Scenario",
     "ScenarioResult",
+    "build_blast_radius_cases",
     "build_rca_cases",
     "build_scenarios",
     "categorical",
     "evaluate",
+    "evaluate_blast_radius",
     "evaluate_rca",
     "evaluate_real_data",
     "inject_value_substitution",

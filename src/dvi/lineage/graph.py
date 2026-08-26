@@ -69,14 +69,15 @@ class LineageGraph:
     def exposures_downstream_of(self, assets: set[str]) -> list[Exposure]:
         """Exposure objects reachable downstream from any of ``assets``.
 
-        Sorted by criticality (worst first), then name — deterministic.
+        Sorted by criticality (worst first), then name, then ``unique_id`` as a
+        total tiebreaker so the order never falls back to set/hash iteration.
         """
         found = [
             self._g.nodes[n]["exposure"]
             for n in self._reachable(assets)
             if self._g.nodes[n].get("kind") == "exposure"
         ]
-        return sorted(found, key=lambda e: (-int(e.criticality), e.name))
+        return sorted(found, key=lambda e: (-int(e.criticality), e.name, e.unique_id))
 
     def data_downstream_of(self, assets: set[str]) -> set[str]:
         """Descendants of ``assets`` that are data nodes (exposures excluded)."""

@@ -62,6 +62,33 @@ def test_exposures_downstream_sorted_by_criticality_then_name():
     ]
 
 
+def test_exposures_downstream_order_is_total_on_criticality_name_ties():
+    # Two exposures with identical criticality AND identical name: the order must
+    # not fall back to set/hash iteration. unique_id is the total tiebreaker, so the
+    # result is stable regardless of PYTHONHASHSEED / insertion order.
+    m = _manifest()
+    del m["exposures"]["exposure.shop.pricing_api"]
+    twin = {
+        "name": "twin",
+        "type": "dashboard",
+        "maturity": "high",
+        "owner": {"name": "sam"},
+        "meta": {},
+        "depends_on": {"nodes": ["model.shop.revenue_daily"]},
+    }
+    m["exposures"]["exposure.shop.twin_b"] = dict(twin)
+    m["exposures"]["exposure.shop.twin_a"] = dict(twin)
+    m["exposures"]["exposure.shop.exec_dashboard"]["name"] = "twin"
+    g = load_dbt_manifest(m)
+    ids = [e.unique_id for e in g.exposures_downstream_of({"model.shop.fact_orders"})]
+    # All three are dashboard/HIGH named "twin"; unique_id breaks the tie ascending.
+    assert ids == [
+        "exposure.shop.exec_dashboard",
+        "exposure.shop.twin_a",
+        "exposure.shop.twin_b",
+    ]
+
+
 def test_data_downstream_of_excludes_exposures():
     g = load_dbt_manifest(_manifest())
     data = g.data_downstream_of({"model.shop.fact_orders"})

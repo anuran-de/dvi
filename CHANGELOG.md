@@ -39,7 +39,7 @@ consumers downstream of them, and their criticality can lift severity.
 - **demo / benchmark scripts** — `scripts/demo.py` and `scripts/benchmark.py`
   print the business-impact block and the blast-radius benchmark section.
 
-156 tests, all green.
+157 tests, all green.
 
 ### M3.1 — Hardening pass (review-driven)
 

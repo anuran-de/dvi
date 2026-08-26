@@ -61,7 +61,7 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 > **material** change (an immaterial flicker under a critical dashboard stays
 > low). A labeled benchmark of blast-radius cases, with decoys (an immaterial
 > critical hit, a material non-critical hit), scores **100% exposure precision,
-> 100% exposure recall, and 100% severity accuracy**. **156 tests, all green.**
+> 100% exposure recall, and 100% severity accuracy**. **157 tests, all green.**
 >
 > **M3.1 — hardening pass: complete.** A three-perspective code review (correctness,
 > detection robustness, calibration honesty) produced a ranked defect list; every

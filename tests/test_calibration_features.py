@@ -77,6 +77,30 @@ def test_significance_margin_grows_with_sample_size():
     assert large.significance_margin > small.significance_margin
 
 
+def test_categorical_margin_is_monotonic_in_effect_size():
+    # The two-proportion SE basis is well-behaved, not saturating pathologically:
+    # at a fixed sample size a larger relocated mass yields a strictly larger
+    # margin (until the documented cap), and a near-zero move stays near zero.
+    from dvi.calibration.features import _MARGIN_CAP, _significance_margin
+    from dvi.detection.symptom import Symptom
+
+    def margin(mass: float) -> float:
+        symptom = Symptom(
+            signature="value_substitution",
+            column="c",
+            magnitude=mass,
+            description="",
+            evidence={},
+        )
+        prof = _cat("c", {"A": 1000})  # only na/nb are read (1000 non-null rows)
+        return _significance_margin(symptom, prof, prof)
+
+    tiny, small, big = margin(0.01), margin(0.1), margin(0.4)
+    assert tiny < small < big
+    assert tiny < 1.0  # a 1%-of-rows move is within a few noise floors, not "huge"
+    assert big <= _MARGIN_CAP
+
+
 def test_numeric_features_use_threshold_margin():
     baseline = _num("amount", {"p05": 10, "p25": 20, "p50": 30, "p75": 40, "p95": 50})
     current = _num("amount", {"p05": 20, "p25": 30, "p50": 40, "p75": 50, "p95": 60})

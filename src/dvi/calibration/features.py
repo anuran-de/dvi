@@ -59,7 +59,12 @@ def _significance_margin(
 
     if symptom.signature in _CATEGORICAL_SIGNATURES:
         # The effect is the relocated/changed mass; its floor is the sampling
-        # noise for a proportion of that size across the two samples.
+        # noise (Z SEs) for a proportion of that size across the two samples. This
+        # gives effect / (Z*sqrt(effect*(1-effect)*(1/na+1/nb))), which simplifies
+        # to a strictly increasing function of the moved mass (~sqrt(effect/(1-effect)))
+        # that also grows with sample size -- i.e. a well-behaved "how many noise
+        # floors past the bar" reading, capped below so one near-total relocation
+        # cannot dominate standardization.
         effect = symptom.magnitude
         floor = noise_threshold(effect, na, nb)
     elif symptom.signature == "numeric_distribution_shift":

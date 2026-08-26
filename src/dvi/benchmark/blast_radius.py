@@ -98,18 +98,24 @@ def _model(uid, deps=()):
 def build_blast_radius_cases() -> list[BlastRadiusCase]:
     cases: list[BlastRadiusCase] = []
 
-    # 1. High-maturity dashboard downstream -> severity high.
-    nodes = {**_model("m.fact"), **_model("m.rev", ["m.fact"])}
-    exp = _exposure("e.dash", "exec_dashboard", "dashboard", "high", ["m.rev"])
+    # 1. High-maturity dashboard hanging off a *leaf* asset (no downstream data), so
+    #    base severity is only "medium" (propagates=False). Reaching "high" therefore
+    #    REQUIRES the dashboard's HIGH criticality to escalate -- this case is diagnostic
+    #    for the escalation path, not merely for exposure identification.
+    nodes_dash = _model("m.leaf")
+    exp = _exposure("e.dash", "exec_dashboard", "dashboard", "high", ["m.leaf"])
     cases.append(
         BlastRadiusCase(
-            "dashboard_high", load_dbt_manifest({"nodes": nodes, "exposures": exp}),
-            "m.fact", {"e.dash"}, "high",
-            note="material change reaching a high-maturity dashboard",
+            "dashboard_high", load_dbt_manifest({"nodes": nodes_dash, "exposures": exp}),
+            "m.leaf", {"e.dash"}, "high",
+            note="leaf change reaching a high-maturity dashboard escalates medium->high",
         )
     )
 
-    # 2. Customer-facing application at high maturity -> critical.
+    # 2. Customer-facing application at high maturity -> critical. Here the change
+    #    propagates to a downstream data asset (base severity already "high"), so this
+    #    case is diagnostic for the *critical* escalation: base "high" must be lifted.
+    nodes = {**_model("m.fact"), **_model("m.rev", ["m.fact"])}
     exp = _exposure("e.api", "pricing_api", "application", "high", ["m.rev"])
     cases.append(
         BlastRadiusCase(

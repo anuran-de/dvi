@@ -46,6 +46,8 @@ def test_invalid_meta_override_falls_back_to_derivation():
 
 
 def test_exposure_is_frozen_and_hashable():
-    e = Exposure("exposure.shop.d", "d", "dashboard", Criticality.HIGH, "jane", "", frozenset({"m"}))
+    e = Exposure(
+        "exposure.shop.d", "d", "dashboard", Criticality.HIGH, "jane", "", frozenset({"m"})
+    )
     assert e.criticality is Criticality.HIGH
     assert hash(e)  # frozen dataclass is hashable

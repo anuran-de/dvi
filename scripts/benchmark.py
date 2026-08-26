@@ -19,6 +19,12 @@ from dvi.benchmark import (
     recall_at_fixed_fp,
     sweep,
 )
+from dvi.calibration.dataset import build_calibration_dataset
+from dvi.calibration.reliability import (
+    build_reliability_report,
+    k_fold_predictions,
+    render_reliability,
+)
 from dvi.detection import DEFAULT_DISTRIBUTION_THRESHOLD
 
 
@@ -89,6 +95,25 @@ def main() -> None:
     print(
         "  Two disjoint samples of the SAME distribution stay silent; a real change "
         "is still caught."
+    )
+
+    print("\n" + "=" * 70)
+    print("  Calibrated confidence (per-symptom, k-fold cross-validated)")
+    print("=" * 70)
+    dataset = build_calibration_dataset(seed=0)
+    positives = sum(s.label for s in dataset)
+    report = build_reliability_report(k_fold_predictions(dataset, k=5, seed=0))
+    print(
+        f"  Dataset: {len(dataset)} fired symptoms, {positives} real "
+        f"({positives / len(dataset):.0%} positive) - real injections + hard negatives + synthetic"
+    )
+    print(f"  Out-of-fold ECE: {report.ece:.4f}   Brier: {report.brier:.4f}")
+    print("  Reliability (predicted vs. empirical, out-of-fold):")
+    for line in render_reliability(report).splitlines()[1:]:
+        print(f"    {line}")
+    print(
+        "  Confidence is conditional on firing; predictions skew to the extremes "
+        "because most fired symptoms are clearly real or clearly noise."
     )
     print()
 

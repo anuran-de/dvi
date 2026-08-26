@@ -148,7 +148,7 @@ def render_reliability(report: ReliabilityReport) -> str:
         if b.count == 0:
             continue
         lines.append(
-            f"| {b.lo:.1f}–{b.hi:.1f} | {b.count} | {b.predicted:.3f} | "
+            f"| {b.lo:.1f}-{b.hi:.1f} | {b.count} | {b.predicted:.3f} | "
             f"{b.empirical:.3f} | {b.gap:.3f} |"
         )
     lines.append(f"ECE = {report.ece:.4f}   Brier = {report.brier:.4f}")

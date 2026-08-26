@@ -17,7 +17,7 @@ from datetime import datetime
 from dvi.lineage import LineageGraph
 from dvi.rca import Observation, RootCauseCandidate
 
-MAGNITUDE_MATERIAL = 0.1
+from .impact import MAGNITUDE_MATERIAL, BusinessImpact, assess_impact, escalate_severity
 
 
 @dataclass
@@ -32,6 +32,7 @@ class Incident:
     change_at: datetime | None = None
     # Measured confidence of the primary symptom, when a calibration model ran.
     confidence: float | None = None
+    business_impact: BusinessImpact | None = None
 
 
 def _severity(max_magnitude: float, propagates: bool) -> str:
@@ -51,15 +52,20 @@ def synthesize_incident(
 
     top = ranked[0]
 
-    downstream: set[str] = set()
-    for target in top.change.targets:
-        downstream |= lineage.downstream(target)
+    # Data-only blast radius: exposure nodes must never leak into affected_assets.
+    downstream_data = lineage.data_downstream_of(set(top.change.targets))
     # Purely downstream impact: exclude the changed asset(s) themselves.
-    affected = (downstream | {o.asset for o in top.explained}) - set(top.change.targets)
+    affected = (downstream_data | {o.asset for o in top.explained}) - set(top.change.targets)
 
     propagates = bool(affected)
     max_magnitude = max((o.symptom.magnitude for o in top.explained), default=0.0)
     severity = _severity(max_magnitude, propagates)
+
+    # Assess business impact over the blast radius plus the changed targets
+    # themselves, so an exposure hanging directly off a changed model is caught.
+    impact_scope = affected | set(top.change.targets)
+    impact = assess_impact(impact_scope, lineage)
+    severity = escalate_severity(severity, impact, max_magnitude)
 
     worst = max(top.explained, key=lambda o: o.symptom.magnitude)
     label = top.change.label or top.change.id
@@ -68,6 +74,14 @@ def synthesize_incident(
         f"{worst.symptom.description or worst.symptom.signature} "
         f"on {worst.asset}; {len(affected)} downstream asset(s) affected."
     )
+    if impact.exposures:
+        counts = ", ".join(
+            f"{len(group)} {type_}" for type_, group in impact.by_type.items()
+        )
+        summary += (
+            f" Reaches {len(impact.exposures)} external consumer(s): {counts} "
+            f"(worst: {impact.max_criticality.name})."
+        )
 
     detected_at = max(o.observed_at for o in top.explained)
     return Incident(
@@ -80,4 +94,5 @@ def synthesize_incident(
         detected_at=detected_at,
         change_at=top.change.timestamp,
         confidence=worst.symptom.confidence,
+        business_impact=impact if impact.exposures else None,
     )

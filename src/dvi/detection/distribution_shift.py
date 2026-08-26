@@ -42,11 +42,22 @@ def _noise_floor(n_baseline: int, n_current: int) -> float:
     return QUANTILE_NOISE_Z * _QUANTILE_NOISE_SD / math.sqrt(n)
 
 
+# A spread within this fraction of the column's magnitude is treated as an
+# effectively-constant column: dividing by such a tiny spread turns sub-ULP
+# jitter into a huge normalized distance. 1e-4 (0.01% of magnitude) is far below
+# any real distribution's relative spread, so this never suppresses genuine drift.
+_REL_SPREAD_EPS = 1e-4
+
+
 def _baseline_scale(quantiles: dict[str, float], stddev: float) -> float | None:
     spread = quantiles.get("p95", 0.0) - quantiles.get("p05", 0.0)
-    if spread > 0:
+    # Absolute floor relative to where the column sits (>= 1 so small-magnitude
+    # columns are judged on an absolute 1e-6, not scaled below it).
+    location = max(abs(quantiles.get("p50", 0.0)), 1.0)
+    floor = _REL_SPREAD_EPS * location
+    if spread > floor:
         return spread
-    if stddev > 0:
+    if stddev > floor:
         return stddev
     return None
 

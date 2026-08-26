@@ -89,6 +89,18 @@ def test_same_shift_is_signal_at_large_n():
     assert symptom.magnitude > 0.1
 
 
+def test_negligible_spread_relative_to_magnitude_does_not_fire():
+    # An effectively-constant column at ~100 (spread 1e-4) must not become a
+    # hair-trigger: a sub-ULP move normalized by that tiny spread would otherwise
+    # read as a huge distance. n is large so the sample-size floor isn't the gate.
+    base_qs = {"p05": 100.0, "p25": 100.0, "p50": 100.0, "p75": 100.0, "p95": 100.0001}
+    curr_qs = {"p05": 100.0, "p25": 100.0, "p50": 100.0, "p75": 100.0, "p95": 100.0002}
+    baseline = _num_n("depth", base_qs, 100_000, stddev=0.00005)
+    current = _num_n("depth", curr_qs, 100_000, stddev=0.00005)
+
+    assert detect_numeric_distribution_shift(baseline, current) is None
+
+
 def test_non_finite_quantile_does_not_fire():
     # Defense in depth: even if a non-finite quantile reaches the detector, the
     # guard `distance < threshold` must not fail open (nan < 0.1 is False) into a

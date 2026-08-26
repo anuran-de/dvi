@@ -14,6 +14,7 @@ from __future__ import annotations
 from dvi.benchmark import (
     build_scenarios,
     evaluate,
+    evaluate_blast_radius,
     evaluate_rca,
     evaluate_real_data,
     recall_at_fixed_fp,
@@ -77,6 +78,15 @@ def main() -> None:
     print(f"    top-1 accuracy   : {rca.top1_accuracy:.0%}")
     if rca.wrong:
         print(f"    mis-ranked       : {', '.join(rca.wrong)}")
+
+    blast = evaluate_blast_radius()
+    print("\n  Blast-radius / business impact (labeled, with decoys):")
+    print(f"    cases              : {len(blast.results)}")
+    print(f"    exposure precision : {blast.precision:.0%}")
+    print(f"    exposure recall    : {blast.recall:.0%}")
+    print(f"    severity accuracy  : {blast.severity_accuracy:.0%}")
+    if blast.wrong:
+        print(f"    wrong              : {', '.join(blast.wrong)}")
 
     print("\n" + "=" * 70)
     print("  Validation on real data (diamonds, 53,940 rows)")

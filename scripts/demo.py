@@ -14,7 +14,8 @@ from datetime import datetime
 
 from dvi.benchmark import inject_value_substitution, make_orders
 from dvi.calibration import load_model
-from dvi.lineage import LineageGraph
+from dvi.incidents import render_business_impact
+from dvi.lineage import Criticality, Exposure, LineageGraph
 from dvi.pipeline import analyze_change
 from dvi.rca import ChangeEvent
 
@@ -23,9 +24,24 @@ ASSET = "model.shop.fact_orders"
 
 def build_lineage() -> LineageGraph:
     g = LineageGraph()
+    g.add_node(ASSET, kind="data")
+    g.add_node("model.shop.revenue_daily", kind="data")
     g.add_edge(ASSET, "model.shop.revenue_daily")
-    g.add_edge("model.shop.revenue_daily", "model.shop.exec_dashboard")
-    g.add_edge("model.shop.revenue_daily", "model.shop.ml_ltv_feature")
+
+    exec_dash = Exposure(
+        "exposure.shop.exec_dashboard", "exec_dashboard", "dashboard",
+        Criticality.HIGH, "jane", "https://bi/exec",
+        frozenset({"model.shop.revenue_daily"}),
+    )
+    pricing_api = Exposure(
+        "exposure.shop.pricing_api", "pricing_api", "application",
+        Criticality.CRITICAL, "platform", "https://api/pricing",
+        frozenset({"model.shop.revenue_daily"}),
+    )
+    for e in (exec_dash, pricing_api):
+        g.add_node(e.unique_id, kind="exposure", exposure=e)
+        for dep in e.depends_on:
+            g.add_edge(dep, e.unique_id)
     return g
 
 
@@ -73,6 +89,10 @@ def main() -> None:
     print("\n  Affected downstream assets:")
     for asset in sorted(incident.affected_assets):
         print(f"    - {asset}")
+    if incident.business_impact is not None:
+        print()
+        for line in render_business_impact(incident.business_impact):
+            print(line)
     print("\n  Evidence:")
     for line in incident.evidence:
         print(f"    * {line}")

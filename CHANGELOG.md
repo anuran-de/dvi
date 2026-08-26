@@ -5,6 +5,42 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M4 — Blast-radius / business-level impact (complete)
+
+An incident's blast radius now extends past data assets to the business
+consumers downstream of them, and their criticality can lift severity.
+
+- **lineage (exposure)** — `Criticality` (an ordered `IntEnum`), `Exposure`,
+  `derive_criticality`: dbt *exposures* (dashboards, ML features, applications,
+  notebooks, analyses) parsed as typed lineage nodes. Criticality is either an
+  explicit `meta.criticality` override or inferred from `type` + dbt
+  `maturity` (a customer-facing, high-maturity `application` is CRITICAL).
+- **lineage (graph)** — exposures parsed from `manifest.json` alongside models
+  as `kind`-tagged nodes with `model → exposure` edges (dangling refs skipped;
+  manifests with no exposures are unchanged); `exposures_downstream_of` /
+  `data_downstream_of` traverse the same graph as any other lineage query.
+- **incidents (impact)** — `BusinessImpact`, `assess_impact`: projects an
+  incident's affected assets onto reachable exposures, grouped by type; the
+  worst reachable `Criticality` drives `criticality_to_severity`.
+  `escalate_severity` raises (never lowers) base severity to the
+  consumer-implied severity, gated on materiality (`max_magnitude >=
+  MAGNITUDE_MATERIAL`) — an immaterial flicker under a critical dashboard
+  stays low. `render_business_impact` renders the grouped, deterministically
+  ordered consumer block.
+- **incidents (severity)** — a new `critical` severity tier, above `high`,
+  reachable only via escalation from a business-critical consumer.
+- **incidents (synthesis)** — `synthesize_incident` now attaches
+  `Incident.business_impact` (`None` when no exposures are reached) and the
+  summary clause names the affected consumers by count and type.
+- **benchmark** — a labeled blast-radius suite (with decoys: an immaterial
+  change under a critical consumer, a material change under a non-critical
+  consumer) scoring exposure precision, exposure recall, and severity
+  accuracy — **100%** on all three.
+- **demo / benchmark scripts** — `scripts/demo.py` and `scripts/benchmark.py`
+  print the business-impact block and the blast-radius benchmark section.
+
+156 tests, all green.
+
 ### M3.1 — Hardening pass (review-driven)
 
 A three-perspective code review of the M1–M3 surface (correctness, detection

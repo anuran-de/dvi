@@ -40,6 +40,7 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 2. **Detects change signatures** — deterministic tests that recognise the statistical fingerprint of a semantic change (e.g. a dominant category's mass collapsing while a new value absorbs it) without needing to "understand" meaning.
 3. **Corroborates** a detected change against deployments/commits and downstream lineage, so an isolated blip stays a *symptom* and only a change that correlates with a deploy and propagates downstream becomes an *incident*.
 4. **Ranks likely root causes with evidence** — every claim is backed by observable facts, never a fabricated confidence number.
+5. **Names the business-level impact** — dbt exposures downstream of an incident (dashboards, ML features, applications) are named by type, and a business-critical consumer can escalate severity into a new `critical` tier — only for a *material* change, never for an immaterial flicker.
 
 ## Design principles
 
@@ -51,6 +52,17 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
+> **M4 — blast-radius / business-level impact: complete.** dbt *exposures*
+> (dashboards, ML features, applications, notebooks) are now parsed from
+> `manifest.json` as typed lineage nodes, so an incident's blast radius extends
+> past data assets to the business consumers downstream of them. `assess_impact`
+> names the affected consumers by type, and the worst reachable criticality can
+> *raise* severity into a new `critical` tier — never lower it, and only for a
+> **material** change (an immaterial flicker under a critical dashboard stays
+> low). A labeled benchmark of blast-radius cases, with decoys (an immaterial
+> critical hit, a material non-critical hit), scores **100% exposure precision,
+> 100% exposure recall, and 100% severity accuracy**. **156 tests, all green.**
+>
 > **M3.1 — hardening pass: complete.** A three-perspective code review (correctness,
 > detection robustness, calibration honesty) produced a ranked defect list; every
 > finding was fixed in priority order, each with a regression test. Highlights: a
@@ -187,7 +199,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 | **M2** ✅ | Signatures 2–5 + negatives/decoys benchmark + real-data validation | Full recall on the suite; **0 false positives on real same-distribution data** |
 | **M3** ✅ | Calibrated logistic confidence + out-of-fold reliability table | Honest, *measured* confidence (ECE ≈ 0.05, MCE ≈ 0.21) |
 | **M3.1** ✅ | Review-driven hardening: import-cycle, non-finite, noise floors, MCE, determinism | Correctness & honesty under scrutiny; 127 tests |
-| **M4** | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
+| **M4** ✅ | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
 | **M5** | Snowflake pushdown profiling + CLI / GitHub Action PR reports | Real-user adoption path |
 | **M6** | Production-grade web UI + incident timeline | Operator experience |
 

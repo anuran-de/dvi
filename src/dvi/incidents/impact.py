@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from dvi.lineage import Criticality, Exposure, LineageGraph
 
-# Kept in sync with incidents.incident.MAGNITUDE_MATERIAL; imported there too.
+# Single source of truth for the materiality floor; incidents.incident imports this.
 MAGNITUDE_MATERIAL = 0.1
 
 _SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}

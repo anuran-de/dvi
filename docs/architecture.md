@@ -18,7 +18,7 @@ infrastructure and builds only the parts that are genuinely novel:
 | Dependency graph | Reuse `networkx` (in-process, no graph DB) |
 | **Change detection** | **Built from scratch** |
 | **Root-cause ranking** | **Built from scratch** |
-| **Blast-radius** | **Built from scratch** _(M4)_ |
+| **Blast-radius** | **Built from scratch** |
 | **Incident synthesis** | **Built from scratch** |
 | **Benchmark + failure injection** | **Built from scratch** |
 
@@ -198,6 +198,31 @@ bounds — a de-calibrating change fails CI.
 is scored (`score.attach_confidence`) and `Incident.confidence` surfaces the
 primary symptom's probability. Confidence is *conditional on firing*, so scores
 skew to the extremes and production `n` pushes real confidences high.
+
+## 8. Business-level impact (M4)
+
+A data incident matters in proportion to who it reaches. dbt **exposures**
+(dashboards, ML features/models, applications, notebooks, analyses) are parsed
+from `manifest.json` as typed lineage nodes alongside models — a `kind`-tagged
+graph with `model → exposure` edges — so blast radius is computed the same way
+as any other downstream traversal (`exposures_downstream_of`), no separate
+integration required.
+
+Each exposure carries a `Criticality` (`derive_criticality`: an explicit
+`meta.criticality` override, else customer-facing/high-maturity applications
+are CRITICAL, then per-type defaults). `assess_impact` (`incidents/impact.py`)
+projects an incident's affected assets onto reachable exposures and groups them
+by type; `render_business_impact` prints them in a fixed order (applications,
+ML features, dashboards, notebooks, analyses) so the operator sees who is hit
+without hunting through a raw list.
+
+The worst reachable criticality can **raise** incident severity — never lower
+it — via `escalate_severity`, and only when the change is **material**
+(`max_magnitude >= MAGNITUDE_MATERIAL`): an immaterial flicker under a
+business-critical dashboard stays low severity, and a large change under a
+critical consumer can escalate all the way to a new `critical` tier above
+`high`. `Incident.business_impact` surfaces the assessment (`None` when no
+exposures are reached) and the summary clause names the affected consumers.
 
 ## 5. Decisions log
 

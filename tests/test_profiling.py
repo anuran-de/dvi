@@ -23,6 +23,17 @@ def test_top_k_holds_value_frequencies_as_counts():
     assert profile.top_k == {"UK": 3, "US": 1, "DE": 1}
 
 
+def test_top_k_truncation_breaks_count_ties_deterministically():
+    # Six values all tied at count 1, keeping only two. Which two survive must not
+    # depend on input/hash order: break ties by value (ascending) so the retained
+    # boundary set is stable and reproducible across runs and machines.
+    series = pl.Series("x", ["d", "c", "f", "a", "e", "b"])
+
+    profile = profile_column(series, top_k=2)
+
+    assert set(profile.top_k) == {"a", "b"}
+
+
 def test_value_share_is_fraction_of_non_null_rows():
     series = pl.Series("country", ["UK", "UK", "US", "US", None])
 

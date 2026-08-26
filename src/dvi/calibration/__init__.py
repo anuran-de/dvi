@@ -6,6 +6,7 @@ probabilities are validated on held-out data with a reliability diagram. No
 hand-tuned confidence numbers.
 """
 
+from .features import FEATURE_NAMES, FeatureVector, extract_features
 from .model import LogisticModel
 
-__all__ = ["LogisticModel"]
+__all__ = ["FEATURE_NAMES", "FeatureVector", "LogisticModel", "extract_features"]

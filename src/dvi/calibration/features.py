@@ -20,6 +20,7 @@ import math
 from dataclasses import dataclass
 
 from ..detection.distribution_shift import DEFAULT_THRESHOLD as DISTRIBUTION_THRESHOLD
+from ..detection.distribution_shift import _noise_floor as _distribution_noise_floor
 from ..detection.significance import noise_threshold
 from ..detection.symptom import Symptom
 from ..detection.unit_scale_shift import ADD_TOLERANCE, MULT_TOLERANCE
@@ -63,7 +64,13 @@ def _significance_margin(
         floor = noise_threshold(effect, na, nb)
     elif symptom.signature == "numeric_distribution_shift":
         effect = float(symptom.evidence.get("normalized_distance", symptom.magnitude))
-        floor = DISTRIBUTION_THRESHOLD
+        # Divide by the SAME effective bar the detector fired against:
+        # max(fixed threshold, sample-size noise floor). Using the flat constant
+        # would overstate significance for a small-n shift the noise floor barely
+        # let through. Use the numeric (finite-value) counts the detector used.
+        nb_num = baseline.numeric.count if baseline.numeric else na
+        nc_num = current.numeric.count if current.numeric else nb
+        floor = max(DISTRIBUTION_THRESHOLD, _distribution_noise_floor(nb_num, nc_num))
     elif symptom.signature == "unit_scale_shift":
         effect = symptom.magnitude
         kind = symptom.evidence.get("kind")

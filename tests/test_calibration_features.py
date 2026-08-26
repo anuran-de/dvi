@@ -87,3 +87,22 @@ def test_numeric_features_use_threshold_margin():
     # A +10 shift on a 40-wide spread is well beyond the 0.10 threshold.
     assert fv.significance_margin > 1.0
     assert not math.isnan(fv.significance_margin)
+
+
+def _numeric_shift_features(n: int):
+    # +10 shift on a 40-wide spread -> normalized distance 0.25, above 0.10.
+    baseline = _num("amount", {"p05": 10, "p25": 20, "p50": 30, "p75": 40, "p95": 50}, n=n)
+    current = _num("amount", {"p05": 20, "p25": 30, "p50": 40, "p75": 50, "p95": 60}, n=n)
+    symptom = detect_numeric_distribution_shift(baseline, current)
+    assert symptom is not None
+    return extract_features(symptom, baseline, current)
+
+
+def test_numeric_significance_margin_is_sample_size_aware():
+    # The detector's firing gate is max(fixed threshold, sample-size noise floor),
+    # so the margin must divide the same distance by that effective bar: identical
+    # normalized distance is less significant at small n (the noise floor dominates)
+    # than at large n (the fixed threshold dominates).
+    small = _numeric_shift_features(40)
+    large = _numeric_shift_features(50_000)
+    assert large.significance_margin > small.significance_margin

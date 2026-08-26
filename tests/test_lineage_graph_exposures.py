@@ -1,4 +1,4 @@
-from dvi.lineage import Criticality, LineageGraph, load_dbt_manifest
+from dvi.lineage import Criticality, load_dbt_manifest
 
 
 def _manifest():

@@ -5,6 +5,47 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M3.1 — Hardening pass (review-driven)
+
+A three-perspective code review of the M1–M3 surface (correctness, detection
+robustness, calibration honesty) surfaced a ranked defect list. Every finding was
+fixed in priority order, each RED-GREEN with a regression test. Where a fix changed
+which symptoms fire on the diamonds calibration set, `coefficients.json` was refit;
+held-out quality is unchanged throughout (ECE ≈ 0.047, MCE ≈ 0.21, Brier ≈ 0.005).
+
+- **CRITICAL — public API import cycle.** `from dvi.calibration import load_model`
+  as the first import in a fresh interpreter raised on a circular import. The
+  pipeline now imports from the calibration *submodules*; covered by fresh-process
+  import tests.
+- **HIGH — one dirty cell fabricated a distribution.** `drop_nulls()` leaves float
+  `NaN`/`inf`, which poison polars mean/std/quantiles. Numeric profiling now keeps
+  only finite values. Distribution shift also gained a sample-size noise floor
+  (`Z·0.38/√n`) so two halves of the same population stop tripping it at small `n`,
+  a negligible-spread guard (spread must clear `1e-4·|location|`), and a non-finite
+  quantile guard that no longer fails open.
+- **HIGH — calibration over-claimed mid-range.** Added **MCE** (worst-bin gap) and a
+  mid-range-bin count to the reliability report and frozen metadata; the honesty
+  docs now state plainly that intermediate probabilities are not calibration-tested.
+  CV folds are **stratified** and single-class training folds are skipped.
+- **MED — detector precedence/false positives.** Value substitution defers
+  one-to-many / many-to-one shapes to #3 instead of mislabelling the largest pair as
+  a rename. Unit/scale shift no longer fires on near-constant columns far from zero
+  (spread below `1e-3·|median|` is treated as scale-free; any real large move there
+  is still caught by #4).
+- **MED — dead feature removed.** The `coverage` feature was a constant 1.0 on the
+  calibration set (weight trained to exactly 0); dropped, leaving the **3-feature**
+  vector `magnitude`, `significance_margin`, `log10_n`.
+- **LOW — correctness/determinism cluster.** Deterministic `top_k` truncation on
+  count ties (secondary sort on value); count-weighted pooled proportion
+  `(x_a+x_b)/(n_a+n_b)` in the significance floor (was the share midpoint);
+  sample-size-aware numeric significance margin (divides by the detector's effective
+  bar, not a flat constant); case/format normalization robust to noise-sized tail
+  categories (significant-set comparison + MIN_SHARE gate on re-spellings); and a
+  characterization test pinning the categorical significance margin as monotonic and
+  non-saturating.
+
+127 tests, all green. `coefficients.json` refit and consistent with a fresh rebuild.
+
 ### M3 — Calibrated confidence (complete)
 
 Each fired symptom now carries a *measured* probability that it is a real change,
@@ -13,9 +54,10 @@ rather than a hand-tuned number. Calibration is proven on held-out data.
 - **calibration (model)** — `LogisticModel`: a pure-Python logistic regression
   (no numpy/scipy/sklearn in the stack) fit by deterministic batch gradient descent
   with L2, standardizing features internally and round-tripping to JSON.
-- **calibration (features)** — `extract_features`: the uniform 4-feature vector
+- **calibration (features)** — `extract_features`: the uniform feature vector
   `magnitude`, `significance_margin` (effect size in multiples of its noise/threshold
-  floor, branching per signature), `coverage`, `log10(min(na, nb))`.
+  floor, branching per signature), `log10(min(na, nb))`. (A fourth `coverage` feature
+  shipped in M3 was dropped in M3.1 as a dead constant — see above.)
 - **calibration (dataset)** — `build_calibration_dataset`: labelled data mixing real
   injected renames over a size×fraction grid (borderline positives), small-`n`
   real-vs-real splits (hard negatives where noise leaks past the guards), and the
@@ -32,9 +74,10 @@ rather than a hand-tuned number. Calibration is proven on held-out data.
   `score_symptom` / `attach_confidence`, an optional `model=` on `detect_symptoms`
   and `analyze_change`, and `Incident.confidence` surfacing the primary symptom's
   score. The demo prints a calibrated confidence line.
-- **result** — out-of-fold **ECE 0.045 / Brier 0.005** on 80 fired symptoms
-  (44% positive). Confidence is conditional on firing, so predictions skew to the
-  extremes; sparse middle bins stay visible in the per-bin table.
+- **result** — out-of-fold **ECE ≈ 0.045 / Brier ≈ 0.005** on the fired-symptom set
+  (refined in M3.1 to 58 symptoms, 34 positive, with MCE ≈ 0.21 now also reported).
+  Confidence is conditional on firing, so predictions skew to the extremes; sparse
+  middle bins stay visible in the per-bin table.
 
 103 tests, all green. The benchmark prints the calibration section end to end.
 

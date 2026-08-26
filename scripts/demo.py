@@ -40,6 +40,7 @@ def main() -> None:
         "deploy #482 (country normalization)",
     )
 
+    model = load_model()
     incident = analyze_change(
         asset=ASSET,
         before=before,
@@ -48,7 +49,7 @@ def main() -> None:
         lineage=build_lineage(),
         changes=[deploy],
         columns=["country"],
-        model=load_model(),
+        model=model,
     )
 
     print("=" * 68)
@@ -65,7 +66,9 @@ def main() -> None:
     print(f"  Change at   : {incident.change_at:%H:%M}")
     print(f"  Detected at : {incident.detected_at:%H:%M}")
     if incident.confidence is not None:
-        print(f"  Confidence  : {incident.confidence:.0%} (calibrated, out-of-fold ECE 0.04)")
+        ece = model.metadata.get("kfold_ece")
+        ece_note = f", out-of-fold ECE {ece:.2f}" if ece is not None else ""
+        print(f"  Confidence  : {incident.confidence:.0%} (calibrated{ece_note})")
     print(f"\n  {incident.summary}")
     print("\n  Affected downstream assets:")
     for asset in sorted(incident.affected_assets):

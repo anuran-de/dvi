@@ -48,6 +48,47 @@ def test_no_shift_when_distribution_stable():
     assert detect_numeric_distribution_shift(baseline, current) is None
 
 
+def _num_n(name: str, qs: dict[str, float], n: int, stddev: float = 12.0) -> ColumnProfile:
+    return ColumnProfile(
+        name=name,
+        row_count=n,
+        null_count=0,
+        distinct_count=n,
+        numeric=NumericStats(
+            count=n,
+            mean=qs["p50"],
+            stddev=stddev,
+            minimum=qs["p05"] - 10,
+            maximum=qs["p95"] + 10,
+            quantiles=qs,
+        ),
+    )
+
+
+# A pure +11.5 location shift on a spread-100 baseline -> normalized distance 0.115,
+# comfortably above the fixed 0.1 threshold, so only a sample-size floor can gate it.
+_BASE_QS = {"p05": 0.0, "p25": 25.0, "p50": 50.0, "p75": 75.0, "p95": 100.0}
+_SHIFTED_QS = {k: v + 11.5 for k, v in _BASE_QS.items()}
+
+
+def test_small_n_shift_is_treated_as_sampling_noise():
+    baseline = _num_n("amount", _BASE_QS, 40)
+    current = _num_n("amount", _SHIFTED_QS, 40)
+    # Distance 0.115 > threshold 0.1, so without a sample-size guard it fires;
+    # at n=40 that movement is within sampling noise and must be suppressed.
+    assert detect_numeric_distribution_shift(baseline, current) is None
+
+
+def test_same_shift_is_signal_at_large_n():
+    baseline = _num_n("amount", _BASE_QS, 5000)
+    current = _num_n("amount", _SHIFTED_QS, 5000)
+    # The identical normalized distance at large n clears the shrinking noise
+    # floor and is a real change.
+    symptom = detect_numeric_distribution_shift(baseline, current)
+    assert symptom is not None
+    assert symptom.magnitude > 0.1
+
+
 def test_non_finite_quantile_does_not_fire():
     # Defense in depth: even if a non-finite quantile reaches the detector, the
     # guard `distance < threshold` must not fail open (nan < 0.1 is False) into a

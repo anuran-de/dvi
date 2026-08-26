@@ -21,6 +21,26 @@ from .symptom import Symptom
 _QUANTILE_KEYS = ["p05", "p25", "p50", "p75", "p95"]
 DEFAULT_THRESHOLD = 0.1
 
+# Sample-size floor. Sample quantiles are noisy at small n, so two random halves
+# of the *same* population routinely clear a flat threshold — the very false
+# positive the categorical significance guard fixed, still live for numerics until
+# now. A sample quantile's sampling SD, expressed in spread (p95-p05) units, is
+# ~C/sqrt(n) (the median's is ≈0.38/sqrt(n) under normality; the mean-abs quantile
+# deviation is of the same order). We require the normalized distance to also clear
+# NOISE_Z such SDs. The coefficient was calibrated on real diamonds real-vs-real
+# splits: at n=250 residual false positives are rare and by n=1000 the fixed
+# threshold dominates, matching the share-based guard's behavior.
+QUANTILE_NOISE_Z = 3.0
+_QUANTILE_NOISE_SD = 0.38  # sample-median SD in spread units at n=1, under normality
+
+
+def _noise_floor(n_baseline: int, n_current: int) -> float:
+    """Smallest normalized distance distinguishable from quantile sampling noise."""
+    n = min(n_baseline, n_current)
+    if n <= 0:
+        return 0.0
+    return QUANTILE_NOISE_Z * _QUANTILE_NOISE_SD / math.sqrt(n)
+
 
 def _baseline_scale(quantiles: dict[str, float], stddev: float) -> float | None:
     spread = quantiles.get("p95", 0.0) - quantiles.get("p05", 0.0)
@@ -59,7 +79,11 @@ def detect_numeric_distribution_shift(
         / len(_QUANTILE_KEYS)
         / scale
     )
-    if distance < threshold:
+    # A move counts only if it clears both the fixed relevance threshold and the
+    # sample-size-aware noise floor (the same move is noise at small n, signal at
+    # large n), mirroring the share-based significance guard.
+    effective_threshold = max(threshold, _noise_floor(b.count, c.count))
+    if distance < effective_threshold:
         return None
 
     magnitude = min(1.0, distance)

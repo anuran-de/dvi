@@ -70,6 +70,13 @@ def detect_value_substitution(
     if not dropped or not gained:
         return None
 
+    # A one-to-many / many-to-one redistribution is a split/merge (signature #3's
+    # domain), not a 1-to-1 substitution. The significance floor above has already
+    # removed noise-sized movers, so ≥2 real movers on one side means a genuine
+    # split/merge — defer to #3 rather than mislabel the largest pair as a rename.
+    if (len(dropped) == 1 and len(gained) >= 2) or (len(gained) == 1 and len(dropped) >= 2):
+        return None
+
     # Match the largest drop to the gain whose mass is closest to it. Ties are
     # broken lexicographically so the result is deterministic regardless of
     # set/hash iteration order.

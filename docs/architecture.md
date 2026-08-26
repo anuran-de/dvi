@@ -168,9 +168,20 @@ categorical grid can't provide). Everything is seeded and derived from profiles.
 predictions via k-fold CV (`index % k`): each row is scored by a model that never
 trained on it. From those pooled `(prob, label)` pairs we build an equal-width
 reliability table (per-bin count, mean predicted, empirical frequency), the
-Expected Calibration Error and the Brier score. No plotting library is available,
-so the "diagram" is a markdown table with visible per-bin counts. Measured:
-**ECE 0.045 / Brier 0.005**.
+Expected Calibration Error, the **Maximum Calibration Error**, and the Brier
+score. No plotting library is available, so the "diagram" is a markdown table with
+visible per-bin counts.
+
+Because confidence is *conditional on firing*, this is a near-separable problem:
+almost all predictions land in the extreme bins (obvious real change vs obvious
+noise), and the intermediate `[0.2, 0.8]` band is sparsely populated. The
+count-weighted **ECE (≈0.047)** is therefore dominated by those well-separated
+extremes — it certifies the model *ranks* real above noise, not that a "0.5" means
+50%. We report **MCE (≈0.21)**, the worst single populated-bin gap, precisely so
+the low ECE is not mistaken for calibrated mid-range confidence, and the frozen
+test asserts the middle stays under-populated rather than claiming it is
+calibrated. **Brier 0.005.** Honest framing: *strong separation of real vs noise;
+intermediate probabilities are not calibration-tested.*
 
 **Freezing** (`loader`) — the shipped model is refit on all the data and frozen to
 `coefficients.json` (weights, intercept, feature scaling, feature order, and the

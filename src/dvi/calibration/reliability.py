@@ -43,13 +43,28 @@ class ReliabilityBin:
 
 @dataclass(frozen=True)
 class ReliabilityReport:
-    """The reliability table plus its scalar calibration summaries."""
+    """The reliability table plus its scalar calibration summaries.
+
+    ``ece`` is count-weighted, so on a near-separable set (most predictions in the
+    0–0.1 and 0.9–1.0 bins) it is dominated by the well-separated extremes and
+    reports how well the model *ranks* real vs noise. ``mce`` — the worst single
+    populated-bin gap — is the honest companion: it surfaces mid-range bins the
+    ECE average hides, and is the number to watch for intermediate-probability
+    calibration.
+    """
 
     bins: list[ReliabilityBin]
     ece: float
+    mce: float
     brier: float
     count: int
     positives: int
+
+    @property
+    def mid_range_count(self) -> int:
+        """Predictions in the intermediate [0.2, 0.8] band (calibration is only
+        meaningfully *tested* where bins are populated)."""
+        return sum(b.count for b in self.bins if b.lo >= 0.2 and b.hi <= 0.8)
 
 
 def assign_folds(n: int, k: int) -> list[int]:
@@ -92,11 +107,23 @@ def expected_calibration_error(pairs: list[Pair], bins: int = 10) -> float:
     return sum(b.count / n * b.gap for b in reliability_table(pairs, bins) if b.count)
 
 
+def max_calibration_error(pairs: list[Pair], bins: int = 10) -> float:
+    """Worst single populated-bin gap between predicted and empirical frequency.
+
+    Unlike the count-weighted ECE, this is not diluted by heavily-populated,
+    well-calibrated extreme bins, so it exposes mid-range miscalibration.
+    """
+    if not pairs:
+        return 0.0
+    return max((b.gap for b in reliability_table(pairs, bins) if b.count), default=0.0)
+
+
 def build_reliability_report(pairs: list[Pair], bins: int = 10) -> ReliabilityReport:
-    """Bundle the table with ECE, Brier and totals."""
+    """Bundle the table with ECE, MCE, Brier and totals."""
     return ReliabilityReport(
         bins=reliability_table(pairs, bins),
         ece=expected_calibration_error(pairs, bins),
+        mce=max_calibration_error(pairs, bins),
         brier=brier_score(pairs),
         count=len(pairs),
         positives=sum(y for _, y in pairs),
@@ -151,5 +178,11 @@ def render_reliability(report: ReliabilityReport) -> str:
             f"| {b.lo:.1f}-{b.hi:.1f} | {b.count} | {b.predicted:.3f} | "
             f"{b.empirical:.3f} | {b.gap:.3f} |"
         )
-    lines.append(f"ECE = {report.ece:.4f}   Brier = {report.brier:.4f}")
+    lines.append(
+        f"ECE = {report.ece:.4f}   MCE = {report.mce:.4f}   Brier = {report.brier:.4f}"
+    )
+    lines.append(
+        f"(ECE is count-weighted, dominated by the extremes; MCE is the worst bin. "
+        f"{report.mid_range_count} of {report.count} predictions land in [0.2, 0.8].)"
+    )
     return "\n".join(lines)

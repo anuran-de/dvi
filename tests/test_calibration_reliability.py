@@ -8,6 +8,7 @@ from dvi.calibration.reliability import (
     build_reliability_report,
     expected_calibration_error,
     k_fold_predictions,
+    max_calibration_error,
     render_reliability,
 )
 
@@ -30,6 +31,19 @@ def test_perfectly_calibrated_set_has_zero_ece():
     # 10 predictions at p=0.3 with exactly 3 positives -> empirical == predicted.
     pairs = [(0.3, 1)] * 3 + [(0.3, 0)] * 7
     assert expected_calibration_error(pairs, bins=10) < 1e-9
+
+
+def test_max_calibration_error_is_the_worst_bin_gap():
+    # bin[0.2] gap .1333, bin[0.8] gap .2 -> worst-bin (MCE) is .2, above ECE .16.
+    mce = max_calibration_error(_MIXED, bins=10)
+    assert abs(mce - 0.2) < 1e-9
+    assert mce >= expected_calibration_error(_MIXED, bins=10)
+
+
+def test_report_exposes_mce_and_render_shows_it():
+    report = build_reliability_report(_MIXED, bins=10)
+    assert abs(report.mce - 0.2) < 1e-9
+    assert "MCE" in render_reliability(report)
 
 
 def test_assign_folds_is_a_disjoint_cover():

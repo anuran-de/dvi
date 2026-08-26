@@ -35,13 +35,27 @@ def test_frozen_metadata_matches_a_rebuild():
     assert abs(on_disk["metadata"]["kfold_ece"] - rebuilt["metadata"]["kfold_ece"]) < 1e-6
 
 
-def test_holdout_calibration_stays_within_bounds():
+def test_holdout_ranking_quality_stays_within_bounds():
     dataset = build_calibration_dataset(seed=0)
     report = build_reliability_report(k_fold_predictions(dataset, k=5, seed=0))
-    # Generous ceilings above the measured ECE≈0.045 / Brier≈0.005; a regression
-    # that de-calibrates the model breaks these.
+    # Count-weighted ECE and Brier certify that the model *ranks* obvious real
+    # changes above obvious noise; a regression that de-separates them breaks these.
     assert report.ece <= 0.15
     assert report.brier <= 0.05
+
+
+def test_intermediate_probabilities_are_not_claimed_as_calibrated():
+    # Honesty guard: this is a near-separable set, so almost all predictions sit in
+    # the extreme bins and the intermediate [0.2, 0.8] band is under-populated. The
+    # worst single-bin gap (MCE) is therefore several times the ECE. We assert the
+    # regime rather than pretend mid-range confidences are calibration-tested, so
+    # nobody reads the low ECE as "0.5 means 50%".
+    dataset = build_calibration_dataset(seed=0)
+    report = build_reliability_report(k_fold_predictions(dataset, k=5, seed=0))
+    assert report.mce >= report.ece  # worst bin is at least the weighted average
+    assert report.mce <= 0.35  # measured ≈0.21; a loose ceiling, not a calibration claim
+    # The middle is sparse by construction; guard against silently over-claiming it.
+    assert report.mid_range_count <= 0.1 * report.count
 
 
 def test_model_scores_strong_change_above_borderline():

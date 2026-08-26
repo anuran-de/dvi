@@ -107,7 +107,10 @@ def main() -> None:
         f"  Dataset: {len(dataset)} fired symptoms, {positives} real "
         f"({positives / len(dataset):.0%} positive) - real injections + hard negatives + synthetic"
     )
-    print(f"  Out-of-fold ECE: {report.ece:.4f}   Brier: {report.brier:.4f}")
+    print(
+        f"  Out-of-fold ECE: {report.ece:.4f}   MCE: {report.mce:.4f}   "
+        f"Brier: {report.brier:.4f}"
+    )
     print("  Reliability (predicted vs. empirical, out-of-fold):")
     for line in render_reliability(report).splitlines()[1:]:
         print(f"    {line}")

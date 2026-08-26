@@ -51,6 +51,31 @@ def test_stable_categories_do_not_fire():
     assert stable is None
 
 
+def test_noise_sized_tail_category_does_not_block_detection():
+    # The dominant categories are an obvious re-casing. A single noise-sized tail
+    # value ("zz", 0.5% of rows) surfaces in current's top_k but not baseline's.
+    # Exact normalized-set equality would bail on that tail difference; a
+    # significance-aware set comparison ignores sub-threshold keys and still
+    # reports the re-spelling of the dominant categories.
+    baseline = _cat("country", {"US": 600, "UK": 200, "DE": 195})
+    current = _cat("country", {"us": 600, "uk": 200, "de": 190, "zz": 5})
+
+    symptom = detect_case_format_normalization(baseline, current)
+
+    assert symptom is not None
+    assert symptom.signature == "case_format_normalization"
+
+
+def test_respelling_of_only_a_noise_sized_category_does_not_fire():
+    # The only surface-form change is on a 0.5%-share tail value (zz -> ZZ). That
+    # is below the relevance floor the other categorical detectors enforce, so a
+    # tail flicker must not fabricate a case/format symptom on its own.
+    baseline = _cat("country", {"US": 600, "UK": 395, "zz": 5})
+    current = _cat("country", {"US": 600, "UK": 395, "ZZ": 5})
+
+    assert detect_case_format_normalization(baseline, current) is None
+
+
 def test_returns_none_for_numeric_column():
     from dvi.profiling import NumericStats
 

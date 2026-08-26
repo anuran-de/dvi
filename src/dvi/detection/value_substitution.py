@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dvi.profiling import ColumnProfile
 
-from .significance import noise_threshold
+from .significance import noise_threshold, pooled_share
 from .symptom import Symptom
 
 # A value must hold at least this share to be considered a real category
@@ -60,8 +60,9 @@ def detect_value_substitution(
         # A share move counts only if it clears both the fixed relevance floor
         # and the sample-size-aware noise floor (a small move on few rows is
         # indistinguishable from sampling noise; the same move on many rows is
-        # real). p_pooled uses the two shares' midpoint.
-        shift_floor = max(MIN_SHIFT, noise_threshold((base_share + curr_share) / 2.0, na, nb))
+        # real). The SE uses the count-weighted pooled proportion.
+        p = pooled_share(base_share, curr_share, na, nb)
+        shift_floor = max(MIN_SHIFT, noise_threshold(p, na, nb))
         if delta <= -shift_floor and base_share >= MIN_SHARE:
             dropped.append((value, -delta))
         elif delta >= shift_floor and curr_share >= MIN_SHARE:

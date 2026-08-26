@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dvi.profiling import ColumnProfile
 
-from .significance import noise_threshold
+from .significance import noise_threshold, pooled_share
 from .symptom import Symptom
 
 MIN_SHARE = 0.03
@@ -49,8 +49,10 @@ def detect_category_split_merge(
         delta = curr_share - base_share
         # Sample-size-aware floor: a share move must clear sampling noise, not
         # just the fixed relevance floor. Each split fragment is checked on its
-        # own, so noise-sized fragments never fabricate a split.
-        shift_floor = max(MIN_SHIFT, noise_threshold((base_share + curr_share) / 2.0, na, nb))
+        # own, so noise-sized fragments never fabricate a split. The SE uses the
+        # count-weighted pooled proportion.
+        p = pooled_share(base_share, curr_share, na, nb)
+        shift_floor = max(MIN_SHIFT, noise_threshold(p, na, nb))
         if delta <= -shift_floor and base_share >= MIN_SHARE:
             dropped.append((value, -delta))
         elif delta >= shift_floor and curr_share >= MIN_SHARE:

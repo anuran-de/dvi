@@ -15,7 +15,11 @@ from datetime import datetime
 
 import polars as pl
 
-from dvi.calibration import LogisticModel, attach_confidence
+# Import from the calibration *submodules*, not the package, to avoid a cycle:
+# the package __init__ pulls loader -> dataset -> benchmark -> back into this
+# module, so importing the package here would see it half-initialized.
+from dvi.calibration.model import LogisticModel
+from dvi.calibration.score import attach_confidence
 from dvi.detection import (
     DEFAULT_DISTRIBUTION_THRESHOLD,
     detect_case_format_normalization,

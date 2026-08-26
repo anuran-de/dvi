@@ -20,6 +20,11 @@ def _numeric_stats(series: pl.Series) -> NumericStats | None:
     if not series.dtype.is_numeric():
         return None
     non_null = series.drop_nulls()
+    # drop_nulls() does not remove float NaN/inf, and polars mean/std/quantile all
+    # return NaN when a NaN is present (NaN also sorts high, poisoning q95). Keep
+    # only finite values so a single dirty cell cannot fabricate a distribution.
+    if series.dtype.is_float():
+        non_null = non_null.filter(non_null.is_finite())
     if non_null.len() == 0:
         return None
     return NumericStats(
@@ -52,11 +57,15 @@ def profile_column(series: pl.Series, top_k: int = DEFAULT_TOP_K) -> ColumnProfi
     if non_null.len() > 0:
         vc = non_null.value_counts(sort=True)
         value_col, count_col = vc.columns[0], vc.columns[1]
-        for value, count in zip(
-            vc[value_col].to_list(), vc[count_col].to_list(), strict=True
-        ):
-            if len(counts) >= top_k:
-                break
+        # value_counts(sort=True) orders by count desc but leaves ties in an
+        # unspecified (input/hash-dependent) order, so which values survive the
+        # top_k cut at a count tie would vary run to run. Re-sort by (count desc,
+        # value asc) to make the truncation boundary deterministic.
+        ranked = sorted(
+            zip(vc[value_col].to_list(), vc[count_col].to_list(), strict=True),
+            key=lambda item: (-int(item[1]), str(item[0])),
+        )
+        for value, count in ranked[:top_k]:
             counts[str(value)] = int(count)
 
     return ColumnProfile(

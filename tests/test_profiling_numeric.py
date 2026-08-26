@@ -1,3 +1,5 @@
+import math
+
 import polars as pl
 
 from dvi.profiling import profile_column
@@ -36,6 +38,32 @@ def test_numeric_stats_expose_ordered_quantiles():
 
 def test_all_null_numeric_column_has_no_numeric_stats():
     series = pl.Series("amount", [None, None, None], dtype=pl.Float64)
+
+    profile = profile_column(series)
+
+    assert profile.numeric is None
+
+
+def test_non_finite_values_are_excluded_from_numeric_stats():
+    # A single NaN/inf must not poison the aggregates: polars mean/std/quantile
+    # all return NaN when a NaN is present, and NaN sorts high so q95 becomes NaN.
+    clean = [float(v) for v in range(1, 101)]  # 1.0..100.0
+    series = pl.Series("amount", [*clean, float("nan"), float("inf"), float("-inf")])
+
+    profile = profile_column(series)
+
+    assert profile.numeric is not None
+    q = profile.numeric.quantiles
+    assert all(math.isfinite(v) for v in q.values())
+    assert math.isfinite(profile.numeric.mean)
+    assert math.isfinite(profile.numeric.stddev)
+    # The finite subset is exactly 1..100, so its stats are unchanged.
+    assert profile.numeric.mean == 50.5
+    assert profile.numeric.maximum == 100.0
+
+
+def test_all_non_finite_numeric_column_has_no_numeric_stats():
+    series = pl.Series("amount", [float("nan"), float("inf"), float("-inf")])
 
     profile = profile_column(series)
 

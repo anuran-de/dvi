@@ -145,12 +145,15 @@ The detectors are deterministic and decide *whether* a symptom fires. The
 means what it says. It is deliberately kept separate: detection semantics never
 depend on the model, and passing no model reproduces exact M1/M2 behavior.
 
-**Feature vector** (`features.extract_features`) — four uniform features per fired
-symptom: `magnitude` (the detector's effect size), `significance_margin` (that
-effect in multiples of its noise/threshold floor; the only feature that branches
-by signature — share noise for categorical, the shift threshold for numeric, the
-fit tolerance for unit/scale), top-`k` `coverage`, and `log10(min(na, nb))`.
-Features are standardized inside the model.
+**Feature vector** (`features.extract_features`) — three uniform features per
+fired symptom: `magnitude` (the detector's effect size), `significance_margin`
+(that effect in multiples of its noise/threshold floor; the only feature that
+branches by signature — share noise for categorical, the shift threshold for
+numeric, the fit tolerance for unit/scale), and `log10(min(na, nb))`. Features are
+standardized inside the model. (A `coverage` feature was removed in M3.1: every
+fired categorical symptom already clears the detectors' `MIN_TOP_K_COVERAGE`
+guard, so it was a constant 1.0 with zero variance and a trained weight of exactly
+0 — a dead input. Dropping it left every prediction unchanged.)
 
 **Model** (`model.LogisticModel`) — a from-scratch logistic regression, because
 numpy/scipy/sklearn are not in the stack. Deterministic batch gradient descent
@@ -168,9 +171,20 @@ categorical grid can't provide). Everything is seeded and derived from profiles.
 predictions via k-fold CV (`index % k`): each row is scored by a model that never
 trained on it. From those pooled `(prob, label)` pairs we build an equal-width
 reliability table (per-bin count, mean predicted, empirical frequency), the
-Expected Calibration Error and the Brier score. No plotting library is available,
-so the "diagram" is a markdown table with visible per-bin counts. Measured:
-**ECE 0.045 / Brier 0.005**.
+Expected Calibration Error, the **Maximum Calibration Error**, and the Brier
+score. No plotting library is available, so the "diagram" is a markdown table with
+visible per-bin counts.
+
+Because confidence is *conditional on firing*, this is a near-separable problem:
+almost all predictions land in the extreme bins (obvious real change vs obvious
+noise), and the intermediate `[0.2, 0.8]` band is sparsely populated. The
+count-weighted **ECE (≈0.047)** is therefore dominated by those well-separated
+extremes — it certifies the model *ranks* real above noise, not that a "0.5" means
+50%. We report **MCE (≈0.21)**, the worst single populated-bin gap, precisely so
+the low ECE is not mistaken for calibrated mid-range confidence, and the frozen
+test asserts the middle stays under-populated rather than claiming it is
+calibrated. **Brier 0.005.** Honest framing: *strong separation of real vs noise;
+intermediate probabilities are not calibration-tested.*
 
 **Freezing** (`loader`) — the shipped model is refit on all the data and frozen to
 `coefficients.json` (weights, intercept, feature scaling, feature order, and the

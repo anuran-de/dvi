@@ -22,6 +22,25 @@ import math
 SIGNIFICANCE_Z = 3.0
 
 
+def pooled_share(
+    base_share: float,
+    curr_share: float,
+    n_baseline: int,
+    n_current: int,
+) -> float:
+    """Count-weighted pooled proportion ``(x_a + x_b) / (n_a + n_b)``.
+
+    This is the proportion the two-sample standard error is built around. The
+    share midpoint ``(p_a + p_b) / 2`` only equals it when the samples are the
+    same size; when they differ, weighting by row counts is the correct pool.
+    Falls back to the midpoint when neither sample size is known.
+    """
+    total = n_baseline + n_current
+    if total <= 0:
+        return (base_share + curr_share) / 2.0
+    return (base_share * n_baseline + curr_share * n_current) / total
+
+
 def noise_threshold(
     pooled_share: float,
     n_baseline: int,

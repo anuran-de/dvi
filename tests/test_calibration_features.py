@@ -54,10 +54,10 @@ def _substitution_features(n: int):
     return extract_features(symptom, baseline, current)
 
 
-def test_feature_vector_has_the_four_named_features_in_order():
+def test_feature_vector_has_the_three_named_features_in_order():
     fv = _substitution_features(1000)
-    assert FEATURE_NAMES == ["magnitude", "significance_margin", "coverage", "log10_n"]
-    assert fv.as_list() == [fv.magnitude, fv.significance_margin, fv.coverage, fv.log10_n]
+    assert FEATURE_NAMES == ["magnitude", "significance_margin", "log10_n"]
+    assert fv.as_list() == [fv.magnitude, fv.significance_margin, fv.log10_n]
 
 
 def test_substitution_features_are_sensible():
@@ -66,8 +66,6 @@ def test_substitution_features_are_sensible():
     assert 0.15 <= fv.magnitude <= 0.25
     # A clean 20-point move on 1000 rows is far above sampling noise.
     assert fv.significance_margin > 1.0
-    # Categorical top_k covers all rows here.
-    assert abs(fv.coverage - 1.0) < 1e-9
     # log10(1000) == 3.
     assert abs(fv.log10_n - 3.0) < 1e-9
 
@@ -79,15 +77,56 @@ def test_significance_margin_grows_with_sample_size():
     assert large.significance_margin > small.significance_margin
 
 
-def test_numeric_features_use_unit_coverage_and_threshold_margin():
+def test_categorical_margin_is_monotonic_in_effect_size():
+    # The two-proportion SE basis is well-behaved, not saturating pathologically:
+    # at a fixed sample size a larger relocated mass yields a strictly larger
+    # margin (until the documented cap), and a near-zero move stays near zero.
+    from dvi.calibration.features import _MARGIN_CAP, _significance_margin
+    from dvi.detection.symptom import Symptom
+
+    def margin(mass: float) -> float:
+        symptom = Symptom(
+            signature="value_substitution",
+            column="c",
+            magnitude=mass,
+            description="",
+            evidence={},
+        )
+        prof = _cat("c", {"A": 1000})  # only na/nb are read (1000 non-null rows)
+        return _significance_margin(symptom, prof, prof)
+
+    tiny, small, big = margin(0.01), margin(0.1), margin(0.4)
+    assert tiny < small < big
+    assert tiny < 1.0  # a 1%-of-rows move is within a few noise floors, not "huge"
+    assert big <= _MARGIN_CAP
+
+
+def test_numeric_features_use_threshold_margin():
     baseline = _num("amount", {"p05": 10, "p25": 20, "p50": 30, "p75": 40, "p95": 50})
     current = _num("amount", {"p05": 20, "p25": 30, "p50": 40, "p75": 50, "p95": 60})
     symptom = detect_numeric_distribution_shift(baseline, current)
     assert symptom is not None
 
     fv = extract_features(symptom, baseline, current)
-    # Numeric columns have no top_k; coverage is not meaningful -> 1.0.
-    assert abs(fv.coverage - 1.0) < 1e-9
     # A +10 shift on a 40-wide spread is well beyond the 0.10 threshold.
     assert fv.significance_margin > 1.0
     assert not math.isnan(fv.significance_margin)
+
+
+def _numeric_shift_features(n: int):
+    # +10 shift on a 40-wide spread -> normalized distance 0.25, above 0.10.
+    baseline = _num("amount", {"p05": 10, "p25": 20, "p50": 30, "p75": 40, "p95": 50}, n=n)
+    current = _num("amount", {"p05": 20, "p25": 30, "p50": 40, "p75": 50, "p95": 60}, n=n)
+    symptom = detect_numeric_distribution_shift(baseline, current)
+    assert symptom is not None
+    return extract_features(symptom, baseline, current)
+
+
+def test_numeric_significance_margin_is_sample_size_aware():
+    # The detector's firing gate is max(fixed threshold, sample-size noise floor),
+    # so the margin must divide the same distance by that effective bar: identical
+    # normalized distance is less significant at small n (the noise floor dominates)
+    # than at large n (the fixed threshold dominates).
+    small = _numeric_shift_features(40)
+    large = _numeric_shift_features(50_000)
+    assert large.significance_margin > small.significance_margin

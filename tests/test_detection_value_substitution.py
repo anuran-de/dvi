@@ -66,6 +66,15 @@ def test_tie_break_is_deterministic():
     assert symptom.to_value == "XX"
 
 
+def test_defers_one_to_many_split_to_signature_three():
+    # X loses 25 points to a new P (+20) and Q (+5): a one-to-many split, which is
+    # #3's job. #1 must not mislabel it as a 1-to-1 X->P substitution by dropping Q.
+    baseline = _profile("region", {"X": 300, "A": 400, "B": 300})
+    current = _profile("region", {"X": 50, "P": 200, "Q": 50, "A": 400, "B": 300})
+
+    assert detect_value_substitution(baseline, current) is None
+
+
 def test_skips_high_cardinality_truncated_column():
     # top_k covers only a small fraction of non-null rows (a long tail was
     # truncated), so a value falling out of top_k would look like a phantom drop.

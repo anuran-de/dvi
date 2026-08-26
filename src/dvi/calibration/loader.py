@@ -54,7 +54,9 @@ def build_coefficients(*, seed: int = 0) -> dict[str, object]:
         "dataset_size": len(dataset),
         "positives": sum(s.label for s in dataset),
         "kfold_ece": report.ece,
+        "kfold_mce": report.mce,
         "kfold_brier": report.brier,
+        "kfold_mid_range": report.mid_range_count,
     }
     return data
 

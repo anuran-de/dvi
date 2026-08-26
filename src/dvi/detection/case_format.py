@@ -26,6 +26,11 @@ MIN_TOP_K_COVERAGE = 0.9
 # Total-variation distance between the two normalized distributions must be below
 # this for the masses to count as "preserved".
 MASS_TOLERANCE = 0.05
+# A normalized category must hold at least this share (on either side) to matter.
+# Sub-threshold tail keys are ignored both when comparing the category sets and
+# when counting re-spellings, so a truncation-tail flicker neither blocks a real
+# re-casing nor fabricates one on its own (mirrors #1/#3's MIN_SHARE floor).
+MIN_SHARE = 0.03
 
 _WHITESPACE = re.compile(r"\s+")
 
@@ -58,28 +63,40 @@ def detect_case_format_normalization(
     if _coverage(baseline) < MIN_TOP_K_COVERAGE or _coverage(current) < MIN_TOP_K_COVERAGE:
         return None
 
-    base_groups = _by_normalized(baseline)
-    curr_groups = _by_normalized(current)
-
-    # Pure re-spelling preserves the normalized category set exactly.
-    if set(base_groups) != set(curr_groups):
-        return None
-
     base_non_null = baseline.non_null_count
     curr_non_null = current.non_null_count
     if base_non_null == 0 or curr_non_null == 0:
         return None
 
+    base_groups = _by_normalized(baseline)
+    curr_groups = _by_normalized(current)
+
+    def _share(groups: dict[str, dict[str, int]], norm: str, non_null: int) -> float:
+        return sum(groups.get(norm, {}).values()) / non_null
+
+    # Pure re-spelling preserves the *significant* normalized category set. A real
+    # new/removed category (>= MIN_SHARE) means substitution/split territory, so
+    # abstain; a sub-threshold tail key that differs between the two truncated
+    # top_k snapshots is ignored rather than blocking detection.
+    base_sig = {n for n in base_groups if _share(base_groups, n, base_non_null) >= MIN_SHARE}
+    curr_sig = {n for n in curr_groups if _share(curr_groups, n, curr_non_null) >= MIN_SHARE}
+    if base_sig != curr_sig:
+        return None
+
     changed_mass = 0.0
     tv_distance = 0.0
     changes: list[tuple[float, str, str, str]] = []
-    for norm in base_groups:
-        base_raw = base_groups[norm]
-        curr_raw = curr_groups[norm]
+    for norm in set(base_groups) | set(curr_groups):
+        base_raw = base_groups.get(norm, {})
+        curr_raw = curr_groups.get(norm, {})
         base_share = sum(base_raw.values()) / base_non_null
         curr_share = sum(curr_raw.values()) / curr_non_null
         tv_distance += abs(curr_share - base_share)
 
+        # Only a category with real mass can drive a re-casing symptom; a flicker
+        # on a sub-threshold tail value must not fabricate one.
+        if base_share < MIN_SHARE or not base_raw or not curr_raw:
+            continue
         # Representative raw spelling on each side (dominant, lexicographic tie-break).
         base_rep = min(base_raw.items(), key=lambda item: (-item[1], item[0]))[0]
         curr_rep = min(curr_raw.items(), key=lambda item: (-item[1], item[0]))[0]

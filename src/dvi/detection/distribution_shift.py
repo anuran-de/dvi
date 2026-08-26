@@ -12,6 +12,8 @@ recall/false-positive operating point (see the benchmark).
 
 from __future__ import annotations
 
+import math
+
 from dvi.profiling import ColumnProfile
 
 from .symptom import Symptom
@@ -41,9 +43,15 @@ def detect_numeric_distribution_shift(
         return None
 
     scale = _baseline_scale(b.quantiles, b.stddev)
-    if scale is None:
+    if scale is None or not math.isfinite(scale):
         return None
     if not all(k in b.quantiles and k in c.quantiles for k in _QUANTILE_KEYS):
+        return None
+    # A non-finite quantile must not slip through: `distance < threshold` fails
+    # open for NaN (nan < 0.1 is False) and would emit a magnitude-1.0 symptom.
+    if not all(
+        math.isfinite(b.quantiles[k]) and math.isfinite(c.quantiles[k]) for k in _QUANTILE_KEYS
+    ):
         return None
 
     distance = (

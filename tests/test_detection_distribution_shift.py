@@ -48,6 +48,21 @@ def test_no_shift_when_distribution_stable():
     assert detect_numeric_distribution_shift(baseline, current) is None
 
 
+def test_non_finite_quantile_does_not_fire():
+    # Defense in depth: even if a non-finite quantile reaches the detector, the
+    # guard `distance < threshold` must not fail open (nan < 0.1 is False) into a
+    # bogus magnitude-1.0 symptom.
+    baseline = _num("amount", {"p05": 30, "p25": 42, "p50": 50, "p75": 58, "p95": 70}, 50, 12)
+    current = _num(
+        "amount",
+        {"p05": 30, "p25": 42, "p50": float("nan"), "p75": 58, "p95": 70},
+        float("nan"),
+        12,
+    )
+
+    assert detect_numeric_distribution_shift(baseline, current) is None
+
+
 def test_returns_none_for_non_numeric_columns():
     baseline = ColumnProfile(
         name="country", row_count=10, null_count=0, distinct_count=2, top_k={"UK": 6, "US": 4}

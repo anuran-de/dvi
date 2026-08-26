@@ -20,6 +20,11 @@ def _numeric_stats(series: pl.Series) -> NumericStats | None:
     if not series.dtype.is_numeric():
         return None
     non_null = series.drop_nulls()
+    # drop_nulls() does not remove float NaN/inf, and polars mean/std/quantile all
+    # return NaN when a NaN is present (NaN also sorts high, poisoning q95). Keep
+    # only finite values so a single dirty cell cannot fabricate a distribution.
+    if series.dtype.is_float():
+        non_null = non_null.filter(non_null.is_finite())
     if non_null.len() == 0:
         return None
     return NumericStats(

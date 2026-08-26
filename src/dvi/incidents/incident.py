@@ -4,9 +4,9 @@ Turns the top-ranked root-cause candidate into an operator-facing incident:
 a summary, a severity, the affected downstream assets, and the evidence bundle.
 
 Crucially, ``synthesize_incident`` returns ``None`` when nothing is corroborated
-— symptoms without a cause never become incidents. No confidence *percentage*
-is emitted here: DVI presents rank + evidence until the calibrated model (M3)
-can produce a *measured* confidence.
+— symptoms without a cause never become incidents. When the primary symptom
+carries a calibrated ``confidence`` (M3), the incident surfaces it as a
+*measured* probability; otherwise ``confidence`` stays ``None``.
 """
 
 from __future__ import annotations
@@ -30,6 +30,8 @@ class Incident:
     evidence: list[str] = field(default_factory=list)
     detected_at: datetime | None = None
     change_at: datetime | None = None
+    # Measured confidence of the primary symptom, when a calibration model ran.
+    confidence: float | None = None
 
 
 def _severity(max_magnitude: float, propagates: bool) -> str:
@@ -77,4 +79,5 @@ def synthesize_incident(
         evidence=list(top.evidence),
         detected_at=detected_at,
         change_at=top.change.timestamp,
+        confidence=worst.symptom.confidence,
     )

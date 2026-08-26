@@ -15,6 +15,7 @@ from datetime import datetime
 
 import polars as pl
 
+from dvi.calibration import LogisticModel, attach_confidence
 from dvi.detection import (
     DEFAULT_DISTRIBUTION_THRESHOLD,
     detect_case_format_normalization,
@@ -69,21 +70,33 @@ def detect_symptoms(
     columns: list[str] | None = None,
     *,
     dist_threshold: float = DEFAULT_DISTRIBUTION_THRESHOLD,
+    model: LogisticModel | None = None,
 ):
-    """Profile the given columns before/after and run every active detector."""
+    """Profile the given columns before/after and run every active detector.
+
+    When ``model`` is supplied, each surviving symptom is annotated with a
+    measured ``confidence``; otherwise ``confidence`` stays ``None`` (M1/M2
+    behavior unchanged).
+    """
     if columns is None:
         columns = [c for c in before.columns if c in after.columns]
 
     detectors = _build_detectors(dist_threshold)
+    profiles: dict[str, tuple] = {}
     symptoms = []
     for column in columns:
         baseline = profile_column(before[column].rename(column))
         current = profile_column(after[column].rename(column))
+        profiles[column] = (baseline, current)
         for detector in detectors:
             symptom = detector(baseline, current)
             if symptom is not None:
                 symptoms.append(symptom)
-    return _apply_precedence(symptoms)
+
+    survivors = _apply_precedence(symptoms)
+    if model is not None:
+        survivors = [attach_confidence(s, *profiles[s.column], model) for s in survivors]
+    return survivors
 
 
 def analyze_change(
@@ -95,13 +108,15 @@ def analyze_change(
     lineage: LineageGraph,
     changes: list[ChangeEvent],
     columns: list[str] | None = None,
+    model: LogisticModel | None = None,
 ) -> Incident | None:
     """Analyze a before/after snapshot of one asset and return an incident.
 
     Returns ``None`` when either no signature fires or nothing corroborates the
-    symptoms into an incident.
+    symptoms into an incident. When ``model`` is supplied, the incident carries a
+    measured confidence for its primary symptom.
     """
-    symptoms = detect_symptoms(before, after, columns)
+    symptoms = detect_symptoms(before, after, columns, model=model)
     if not symptoms:
         return None
 

@@ -7,6 +7,16 @@ hand-tuned confidence numbers.
 """
 
 from .features import FEATURE_NAMES, FeatureVector, extract_features
+from .loader import load_model
 from .model import LogisticModel
+from .score import attach_confidence, score_symptom
 
-__all__ = ["FEATURE_NAMES", "FeatureVector", "LogisticModel", "extract_features"]
+__all__ = [
+    "FEATURE_NAMES",
+    "FeatureVector",
+    "LogisticModel",
+    "attach_confidence",
+    "extract_features",
+    "load_model",
+    "score_symptom",
+]

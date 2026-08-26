@@ -23,3 +23,7 @@ class Symptom(BaseModel):
     # Populated by substitution-style signatures.
     from_value: str | None = None
     to_value: str | None = None
+
+    # Measured probability that this symptom is a real change (set by the M3
+    # calibration layer when a model is supplied; ``None`` leaves M1/M2 behavior).
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)

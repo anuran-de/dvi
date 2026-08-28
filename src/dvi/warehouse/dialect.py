@@ -110,3 +110,25 @@ class DuckDBDialect(SqlDialect):
 
     def _quantile_term(self, cond: str, name: str, frac: str) -> str:
         return f"QUANTILE_CONT({cond}, {frac}) AS {name}"
+
+
+class SnowflakeDialect(SqlDialect):
+    name = "snowflake"
+    _NUMERIC_TYPES = frozenset(
+        {
+            "NUMBER", "DECIMAL", "NUMERIC",
+            "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT", "BYTEINT",
+            "FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL",
+        }
+    )
+
+    def types_query(self, table: str) -> str:
+        return f"DESCRIBE TABLE {table}"
+
+    def _finite_predicate(self, qcol: str) -> str:
+        # Snowflake lacks isfinite(); exclude the special FLOAT values instead.
+        # Snowflake's NaN = NaN is TRUE, so NOT IN correctly drops NaN too.
+        return f"{qcol} NOT IN ('NaN'::FLOAT, 'inf'::FLOAT, '-inf'::FLOAT)"
+
+    def _quantile_term(self, cond: str, name: str, frac: str) -> str:
+        return f"PERCENTILE_CONT({frac}) WITHIN GROUP (ORDER BY {cond}) AS {name}"

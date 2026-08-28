@@ -37,9 +37,11 @@ def _pushdown_profiles(con, table, columns):
 
 
 def _assert_same_decision(polars_inc, pushdown_inc):
-    assert (polars_inc is None) == (pushdown_inc is None)
-    if polars_inc is None:
-        return
+    # Non-vacuous: if a fixture ever stopped firing, both sides would silently
+    # collapse to None and a naive `(a is None) == (b is None)` comparison would
+    # pass on that vacuous agreement. Fail loudly instead.
+    assert polars_inc is not None, "polars path produced no incident"
+    assert pushdown_inc is not None, "pushdown path produced no incident"
     assert polars_inc.severity == pushdown_inc.severity
     ps = polars_inc.primary_cause.explained[0].symptom
     us = pushdown_inc.primary_cause.explained[0].symptom
@@ -48,6 +50,13 @@ def _assert_same_decision(polars_inc, pushdown_inc):
     assert ps.from_value == us.from_value
     assert ps.to_value == us.to_value
     assert polars_inc.affected_assets == pushdown_inc.affected_assets
+    # NOTE on numeric top_k: for numeric columns the profiler keys top_k with
+    # Python `str(value)` while the SQL side uses `CAST(col AS VARCHAR)`; those
+    # two representations can diverge for some floats (precision, scientific
+    # notation). No numeric detector consults top_k for a decision, so this is
+    # representational-only and intentionally NOT asserted here -- we compare
+    # the decision (signature/column/from-to/severity/affected_assets), not the
+    # raw profile payload.
 
 
 def _run_both(before: pl.DataFrame, after: pl.DataFrame, columns):
@@ -82,4 +91,27 @@ def test_unit_scale_shift_decides_identically():
     before = make_orders(n=1000, uk_share=0.2, seed=7)
     # A silent unit change: amounts scaled x100 (e.g., dollars -> cents).
     after = before.with_columns((pl.col("amount") * 100.0).alias("amount"))
+    _assert_same_decision(*_run_both(before, after, ["amount"]))
+
+
+def test_case_format_normalization_decides_identically():
+    before = make_orders(n=1000, uk_share=0.2, seed=7)
+    # Every country code is re-cased ("UK" -> "uk"); same underlying categories
+    # and masses, only the surface form moved.
+    after = before.with_columns(pl.col("country").str.to_lowercase())
+    _assert_same_decision(*_run_both(before, after, ["country"]))
+
+
+def test_numeric_distribution_shift_decides_identically():
+    before = make_orders(n=1000, uk_share=0.2, seed=7)
+    # A genuine behavioral shift, not a unit/scale re-encoding: only the upper
+    # tail fans out (values above 85 triple) while the lower quantiles hold
+    # steady, so no single affine map (factor or offset) fits all of them --
+    # unit_scale_shift must abstain and numeric_distribution_shift must fire.
+    after = before.with_columns(
+        pl.when(pl.col("amount") > 85.0)
+        .then(pl.col("amount") * 3.0)
+        .otherwise(pl.col("amount"))
+        .alias("amount")
+    )
     _assert_same_decision(*_run_both(before, after, ["amount"]))

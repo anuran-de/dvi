@@ -1,8 +1,8 @@
 """Compute a :class:`ColumnProfile` from column data.
 
-The M1 path profiles an in-memory Polars ``Series``. A warehouse pushdown path
-(computing the same profile via SQL, extracting only the compact result) is on
-the roadmap (M5) and will produce the same ``ColumnProfile`` shape.
+This path profiles an in-memory Polars ``Series``. The warehouse pushdown path
+(``dvi.warehouse``) computes the same ``ColumnProfile`` via SQL and pulls back
+only the compact result; both producers are held to detection-equivalence.
 """
 
 from __future__ import annotations

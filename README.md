@@ -42,6 +42,8 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 4. **Ranks likely root causes with evidence** — every claim is backed by observable facts, never a fabricated confidence number.
 5. **Names the business-level impact** — dbt exposures downstream of an incident (dashboards, ML features, applications) are named by type, and a business-critical consumer can escalate severity into a new `critical` tier — only for a *material* change, never for an immaterial flicker.
 
+- **Warehouse pushdown profiling** — step 1 can also run **inside the warehouse**: a `SqlDialect` (DuckDB, Snowflake) computes the `ColumnProfile` in SQL and only the compact profile comes back, so profiling a billion-row table moves a handful of aggregates, not the table. See [Warehouse pushdown profiling](docs/warehouse-pushdown.md).
+
 ## Design principles
 
 - **Integrate, don't replace.** Reuse dbt's lineage, your warehouse, DuckDB, `sqlglot`. Build only the intelligence layer from scratch.
@@ -52,6 +54,22 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
+> **M5a — warehouse pushdown profiling: complete.** DVI's semantic detectors now
+> consume a `ColumnProfile` computed **in the warehouse via SQL**, not only from
+> an in-memory Polars `Series`. A new `dvi.warehouse` package's `SqlDialect`
+> (`DuckDBDialect`, `SnowflakeDialect`) emits per-column profiling SQL;
+> `SqlProfileSource` runs it through a thin `execute(sql) -> rows` callable — DVI
+> never opens a connection itself — and adapts the rows into the same
+> `ColumnProfile` the local profiler builds. `analyze_change_from_profiles` is a
+> twin of `analyze_change` over a shared `detect_symptoms_from_profiles` core, so
+> the pushdown path and the local Polars path run identical detection logic.
+> DuckDB is the CI-executed reference; Snowflake's SQL is unit-tested by string
+> assertion but not executed in CI (its driver pulls `pyarrow`, which DVI
+> deliberately avoids). Parity is **detection-equivalent, proven**:
+> `tests/test_pushdown_equivalence.py` runs categorical and numeric cases through
+> both engines and asserts decision-identical incidents. **180 tests, all green.**
+> See [Warehouse pushdown profiling](docs/warehouse-pushdown.md).
+>
 > **M4 — blast-radius / business-level impact: complete.** dbt *exposures*
 > (dashboards, ML features, applications, notebooks) are now parsed from
 > `manifest.json` as typed lineage nodes, so an incident's blast radius extends
@@ -200,14 +218,16 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 | **M3** ✅ | Calibrated logistic confidence + out-of-fold reliability table | Honest, *measured* confidence (ECE ≈ 0.05, MCE ≈ 0.21) |
 | **M3.1** ✅ | Review-driven hardening: import-cycle, non-finite, noise floors, MCE, determinism | Correctness & honesty under scrutiny; 127 tests |
 | **M4** ✅ | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
-| **M5** | Snowflake pushdown profiling + CLI / GitHub Action PR reports | Real-user adoption path |
+| **M5a** ✅ | Warehouse pushdown profiling (DuckDB executed, Snowflake dialect + SQL-gen tests) + `analyze_change_from_profiles`, cross-engine detection-equivalence | Pushdown path is detection-equivalent to local profiling |
+| **M5b** | CLI / GitHub Action PR reports | Real-user adoption path |
 | **M6** | Production-grade web UI + incident timeline | Operator experience |
 
 Commodity signatures (null-explosion, cardinality, volume, duplicate-rate, schema/type) are slotted in where cheap.
 
 ### Explicitly not built yet
 - Automatic BI/ML lineage discovery (Tableau/Looker/feature stores) — downstream assets register via dbt exposures / a generic API until then.
-- Warehouses other than Snowflake (DuckDB/Postgres work via the local profiling path).
+- Warehouses beyond DuckDB (executed in CI) and Snowflake (dialect + SQL-gen tests, not CI-executed) — another warehouse needs a new `SqlDialect`, not a new profiling path.
+- A CLI / GitHub Action surface for the pushdown path (M5b).
 - Any autonomous remediation.
 
 ## Getting started

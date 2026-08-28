@@ -12,7 +12,7 @@ infrastructure and builds only the parts that are genuinely novel:
 | Concern | Approach |
 |---------|----------|
 | Metadata / temporal store | Reuse Postgres _(planned)_; SQLite/in-memory for tests |
-| Profiling execution | Reuse DuckDB / Polars locally; Snowflake pushdown _(planned, M5)_ |
+| Profiling execution | Reuse DuckDB / Polars locally; DuckDB / Snowflake pushdown via SQL (M5a) |
 | Lineage | Reuse dbt `manifest.json` |
 | SQL parsing | Reuse `sqlglot` _(as needed)_ |
 | Dependency graph | Reuse `networkx` (in-process, no graph DB) |
@@ -94,6 +94,7 @@ src/dvi/
   incidents/    incident + evidence synthesis (surfaces calibrated confidence)
   pipeline/     detector registry + precedence; analyze_change orchestration
   benchmark/    synthetic scenarios, evaluation runner, real-data validation
+  warehouse/    SqlDialect (DuckDB/Snowflake) + SqlProfileSource: in-warehouse profiling
 ```
 
 ## 6. Benchmark and operating point
@@ -223,6 +224,44 @@ business-critical dashboard stays low severity, and a large change under a
 critical consumer can escalate all the way to a new `critical` tier above
 `high`. `Incident.business_impact` surfaces the assessment (`None` when no
 exposures are reached) and the summary clause names the affected consumers.
+
+## 9. Warehouse pushdown (M5a)
+
+Every detector consumes a `ColumnProfile`, never raw rows — so profiling does
+not have to happen in-process. `dvi.warehouse` computes the *same*
+`ColumnProfile` by pushing the aggregation down into the warehouse as SQL and
+pulling back only the compact result.
+
+**Dialect** (`warehouse/dialect.py`) — `SqlDialect` is the abstract seam: four
+methods that render base counts (row count, null count, distinct count),
+numeric aggregates (quantiles, stddev, a finite-only exclusion predicate), and
+top-K categorical frequencies as SQL for one column against one table.
+`DuckDBDialect` and `SnowflakeDialect` are its two implementations — same
+shape, warehouse-flavored SQL (e.g. Snowflake's `PERCENTILE_CONT ... WITHIN
+GROUP` vs DuckDB's quantile functions).
+
+**Executor contract** (`warehouse/sql_source.py`) — `SqlProfileSource(execute,
+table, *, dialect, top_k)` never opens a connection itself. `execute` is a thin
+`Callable[[str], Iterable[Sequence]]` — the DBAPI `fetchall()` shape — so the
+caller owns the connection, auth, and lifecycle; DVI only builds SQL (via the
+dialect) and adapts the returned rows into `ColumnProfile`. This keeps
+`dvi.warehouse` free of any driver dependency: DuckDB is exercised directly in
+tests/CI, while Snowflake's SQL is verified by string assertion only (its
+driver pulls `pyarrow`, which DVI avoids everywhere else).
+
+**Shared detection seam** (`pipeline`) — `analyze_change_from_profiles` is a
+twin of `analyze_change` that takes profile dicts directly instead of raw
+column data, built over a `detect_symptoms_from_profiles` core shared with the
+local Polars path. Same profiles in, same detector registry, same precedence
+rules — the two producers (`profiling.profiler`, `warehouse.SqlProfileSource`)
+are interchangeable from the pipeline's point of view.
+
+**Detection-equivalence, not bit-identity** — the bar for the pushdown path is
+that it reaches the **same decisions** as the local path on the same data, not
+that every float matches to the last digit (SQL and Polars aggregate in
+different orders). `tests/test_pushdown_equivalence.py` runs categorical and
+numeric change scenarios through both DuckDB and Polars and asserts the fired
+incidents are decision-identical.
 
 ## 5. Decisions log
 

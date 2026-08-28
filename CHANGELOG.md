@@ -5,6 +5,32 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M5a — Warehouse pushdown profiling (complete)
+
+Warehouse pushdown profiling: compute `ColumnProfile` in-warehouse via SQL
+(DuckDB executed, Snowflake dialect + SQL-gen tests); `analyze_change_from_profiles`;
+cross-engine detection-equivalence.
+
+- **warehouse (dialect)** — `SqlDialect` (abstract) + `DuckDBDialect` +
+  `SnowflakeDialect`: each emits per-column profiling SQL (base counts, numeric
+  quantiles/stddev/finite-only aggregates, top-K categorical frequencies).
+  Snowflake's SQL is unit-tested by string assertion; it is not executed in CI
+  because its driver pulls `pyarrow`, which DVI avoids.
+- **warehouse (source)** — `SqlProfileSource(execute, table, *, dialect, top_k)`:
+  a thin `execute(sql) -> rows` callable is the only connection contract — DVI
+  never opens a connection itself — and rows are adapted into the same
+  `ColumnProfile` the Polars profiler builds.
+- **pipeline** — `analyze_change_from_profiles`, a twin of `analyze_change`, plus
+  a shared `detect_symptoms_from_profiles` core so the pushdown path and the
+  local Polars path run identical detection logic.
+- **tests** — `tests/test_pushdown_equivalence.py`: categorical and numeric
+  cases run through DuckDB and Polars and assert decision-identical incidents
+  (detection-equivalence, not bit-identical floats).
+- **docs** — [`docs/warehouse-pushdown.md`](docs/warehouse-pushdown.md): the
+  executor contract, DuckDB and Snowflake usage, and the equivalence guarantee.
+
+180 tests, all green.
+
 ### M4 — Blast-radius / business-level impact (complete)
 
 An incident's blast radius now extends past data assets to the business

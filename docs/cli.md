@@ -91,6 +91,10 @@ comment (updated in place on each run, keyed off a hidden `<!-- dvi-report -->`
 marker) via the runner's `gh` CLI, and fails the check on the CLI's exit code.
 No third-party action is required.
 
+The workflow shipped in this repo (`.github/workflows/dvi-example.yml`) guards
+the analysis step on the presence of a `dvi.toml`, so the job stays green until
+you add a config — copy it as a starting point and drop in your `dvi.toml`.
+
 ## Snowflake
 
 The warehouse source runs against DuckDB out of the box. Snowflake uses the same

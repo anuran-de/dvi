@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from dvi.detection import DEFAULT_DISTRIBUTION_THRESHOLD
-from dvi.pipeline.analyze import detect_symptoms
 from dvi.rca import rank_root_causes
 
 from .rca_cases import RcaCase, build_rca_cases
@@ -64,6 +63,8 @@ class OperatingPoint:
 
 
 def _score(scenario: Scenario, dist_threshold: float) -> ScenarioResult:
+    from dvi.pipeline.analyze import detect_symptoms
+
     symptoms = detect_symptoms(
         scenario.before, scenario.after, scenario.columns, dist_threshold=dist_threshold
     )

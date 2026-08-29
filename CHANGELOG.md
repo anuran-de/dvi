@@ -5,6 +5,39 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M5b — CLI + GitHub Action (complete, 2026-08-30)
+
+A `dvi` CLI and a composite GitHub Action drive the pipeline from a single
+`dvi.toml`, closing the real-user adoption path: config → source adapter →
+render → exit code.
+
+- **cli (config)** — `dvi.toml` (TOML + `tomllib`, validated by pydantic):
+  one asset, an optional column subset, a `[source]` (`file` or `warehouse`,
+  keyed by `kind`), a `[lineage]` manifest path, one or more `[[changes]]`
+  (explicit, RCA-attributed, required ISO-8601 `timestamp`), and a `[gate]`
+  (`fail_on` severity, `model` on by default).
+- **cli (sources)** — a file adapter (`.parquet`/`.csv`/`.ndjson` via polars)
+  and a warehouse adapter (DuckDB, opened read-only, profiling pushed into
+  SQL per M5a) both converge on the same `Incident | None` seam.
+- **cli (render)** — Markdown + JSON report rendering, written to
+  `dvi-report.md` / `dvi-report.json` and echoed to stdout.
+- **cli (gate + exit codes)** — a configurable severity gate (`fail_on`)
+  drives the process exit code: `0` (no incident, or below gate), `1`
+  (gate tripped), `2` (could not run — bad config, missing input, unresolved
+  target).
+- **cli (entrypoint)** — `dvi analyze --config dvi.toml --output-dir DIR`,
+  with `--source-before`/`--source-after` overrides so CI can inject
+  PR-specific paths without rewriting the config.
+- **action** — a composite GitHub Action that installs DVI, runs `dvi
+  analyze`, and posts the report as a **sticky** pull-request comment (keyed
+  off a hidden `<!-- dvi-report -->` marker, updated in place on each run) via
+  the runner's `gh` CLI, failing the check on the CLI's exit code. No
+  third-party action required.
+- **docs** — [`docs/cli.md`](docs/cli.md): install, `dvi.toml` reference,
+  exit-code table, and the GitHub Action workflow.
+
+223 tests, all green.
+
 ### M5a — Warehouse pushdown profiling (complete)
 
 Warehouse pushdown profiling: compute `ColumnProfile` in-warehouse via SQL

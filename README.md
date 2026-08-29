@@ -54,6 +54,15 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
+> **M5b — CLI + GitHub Action: complete.** A `dvi` CLI and a composite GitHub
+> Action drive the whole pipeline off a single `dvi.toml`: config → source
+> adapter (file or warehouse) → detection/RCA/blast-radius → a severity-gated
+> Markdown + JSON report. `dvi analyze` writes `dvi-report.md` / `dvi-report.json`
+> and exits `0` (clean/below gate), `1` (gate tripped), or `2` (could not run);
+> the Action installs DVI, runs it on a PR, and posts the report as a **sticky**
+> comment, failing the check on the CLI's exit code. See [`docs/cli.md`](docs/cli.md).
+> **223 tests, all green.**
+>
 > **M5a — warehouse pushdown profiling: complete.** DVI's semantic detectors now
 > consume a `ColumnProfile` computed **in the warehouse via SQL**, not only from
 > an in-memory Polars `Series`. A new `dvi.warehouse` package's `SqlDialect`
@@ -219,7 +228,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 | **M3.1** ✅ | Review-driven hardening: import-cycle, non-finite, noise floors, MCE, determinism | Correctness & honesty under scrutiny; 127 tests |
 | **M4** ✅ | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
 | **M5a** ✅ | Warehouse pushdown profiling (DuckDB executed, Snowflake dialect + SQL-gen tests) + `analyze_change_from_profiles`, cross-engine detection-equivalence | Pushdown path is detection-equivalent to local profiling |
-| **M5b** | CLI / GitHub Action PR reports | Real-user adoption path |
+| **M5b** ✅ | CLI (`dvi analyze`) + composite GitHub Action posting sticky PR reports, severity-gated | Real-user adoption path |
 | **M6** | Production-grade web UI + incident timeline | Operator experience |
 
 Commodity signatures (null-explosion, cardinality, volume, duplicate-rate, schema/type) are slotted in where cheap.
@@ -227,7 +236,9 @@ Commodity signatures (null-explosion, cardinality, volume, duplicate-rate, schem
 ### Explicitly not built yet
 - Automatic BI/ML lineage discovery (Tableau/Looker/feature stores) — downstream assets register via dbt exposures / a generic API until then.
 - Warehouses beyond DuckDB (executed in CI) and Snowflake (dialect + SQL-gen tests, not CI-executed) — another warehouse needs a new `SqlDialect`, not a new profiling path.
-- A CLI / GitHub Action surface for the pushdown path (M5b).
+- Auto-derived change events — `[[changes]]` is declared explicitly in `dvi.toml`; DVI does not yet infer changes from commit/deploy history.
+- Multi-asset runs — one `dvi analyze` run covers one asset; scanning a whole project needs one config per asset.
+- Forges beyond GitHub — the composite Action posts via the runner's `gh` CLI; GitLab/Bitbucket equivalents are not built.
 - Any autonomous remediation.
 
 ## Getting started

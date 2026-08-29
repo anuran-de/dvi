@@ -263,6 +263,44 @@ different orders). `tests/test_pushdown_equivalence.py` runs categorical and
 numeric change scenarios through both DuckDB and Polars and asserts the fired
 incidents are decision-identical.
 
+## 10. CLI + GitHub Action (M5b)
+
+`dvi.cli` is a **thin orchestration layer**, not a new detection path: it wires
+config → source adapter → pipeline → render → exit code, and delegates every
+decision about *whether* something changed to the existing pipeline. No
+detection, corroboration, or ranking logic lives in the CLI.
+
+**Config** (`cli/config.py`) — `DviConfig` (pydantic, loaded from `dvi.toml`
+via `tomllib`) models one asset, an optional column subset, a `[source]`
+(`FileSourceConfig` or `WarehouseSourceConfig`, discriminated by `kind`), a
+`[lineage]` manifest path, one or more `[[changes]]` (explicit `ChangeConfig`
+entries — DVI does not infer changes from commit/deploy history), and a
+`[gate]` (`fail_on` severity, `model` on by default). A malformed or
+incomplete config raises `DviError`.
+
+**Sources** (`cli/sources.py`) — `incident_from_config(config)` dispatches on
+`config.source.kind` to one of two adapters — a file adapter (polars over
+`.parquet`/`.csv`/`.ndjson`) or a warehouse adapter (a read-only DuckDB
+connection feeding `SqlProfileSource`, the M5a pushdown seam) — and both
+**converge on the same `Incident | None`** result. The CLI, the renderer, and
+the gate never know which adapter ran; adding a new source means adding a new
+adapter behind this same seam, not touching orchestration.
+
+**Gate + exit codes** (`cli/gate.py`, `cli/main.py`) — `gate_failed(severity,
+fail_on)` compares the incident's severity against the configured threshold;
+`dvi analyze` translates the outcome into the process exit code: `0` (no
+incident, or below `fail_on`), `1` (gate tripped), `2` (a `DviError` —
+could not run at all). Render (`cli/render.py`) writes `dvi-report.md` /
+`dvi-report.json` and echoes the Markdown before the process exits.
+
+**GitHub Action** (`action.yml`) — a composite action that is itself a **thin
+wrapper**: it installs DVI, runs `dvi analyze`, and gates the check on the
+CLI's exit code. Its own contribution is posting the rendered Markdown as a
+**sticky** pull-request comment — found and updated in place via a hidden
+`<!-- dvi-report -->` marker, through the runner's `gh` CLI — so no incident
+detection, severity logic, or state lives in the Action; all of it is the
+CLI's exit code and report.
+
 ## 5. Decisions log
 
 - **Wedge, not platform.** Ship semantic/behavioral change detection deep; treat

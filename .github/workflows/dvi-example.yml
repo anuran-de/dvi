@@ -1,0 +1,28 @@
+name: DVI
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  dvi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Only run DVI when the repo actually declares a config. This keeps the
+      # example safe to drop in before `dvi.toml` exists (the job stays green
+      # instead of failing on a missing config) and lets this workflow live in
+      # the DVI repo itself without red-flagging DVI's own PRs.
+      - id: config
+        shell: bash
+        run: |
+          if [ -f dvi.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No dvi.toml at the repo root — skipping DVI analysis."
+          fi
+      - if: steps.config.outputs.present == 'true'
+        uses: ./
+        with:
+          config: dvi.toml

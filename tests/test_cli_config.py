@@ -1,0 +1,94 @@
+import pytest
+from pydantic import ValidationError
+
+from dvi.cli.config import DviConfig, DviError, load_config
+
+_BASE = {
+    "asset": "model.shop.fct_orders",
+    "lineage": {"manifest": "target/manifest.json"},
+    "changes": [
+        {"id": "pr-1", "targets": ["model.shop.stg_orders"],
+         "timestamp": "2026-08-30T12:00:00Z"}
+    ],
+}
+
+
+def _with_source(source):
+    return {**_BASE, "source": source}
+
+
+def test_file_config_parses_with_defaults():
+    cfg = DviConfig.model_validate(
+        _with_source({"kind": "file", "before": "b.csv", "after": "a.csv"})
+    )
+    assert cfg.source.kind == "file"
+    assert cfg.source.before == "b.csv"
+    assert cfg.gate.fail_on == "high"   # default
+    assert cfg.gate.model is True       # default
+    assert cfg.columns is None
+
+
+def test_warehouse_config_parses():
+    cfg = DviConfig.model_validate(
+        _with_source({"kind": "warehouse", "database": "w.duckdb",
+                      "before_table": "prod.x", "after_table": "pr.x"})
+    )
+    assert cfg.source.kind == "warehouse"
+    assert cfg.source.before_table == "prod.x"
+
+
+def test_mixed_source_keys_rejected():
+    # a file source carrying a warehouse-only key must fail (extra=forbid)
+    with pytest.raises(ValidationError):
+        DviConfig.model_validate(
+            _with_source({"kind": "file", "before": "b", "after": "a",
+                          "database": "w.duckdb"})
+        )
+
+
+def test_empty_changes_rejected():
+    bad = {**_BASE, "changes": [],
+           "source": {"kind": "file", "before": "b", "after": "a"}}
+    with pytest.raises(ValidationError):
+        DviConfig.model_validate(bad)
+
+
+def test_bad_fail_on_rejected():
+    with pytest.raises(ValidationError):
+        DviConfig.model_validate({
+            **_with_source({"kind": "file", "before": "b", "after": "a"}),
+            "gate": {"fail_on": "severe"},
+        })
+
+
+def test_load_config_reads_toml_file(tmp_path):
+    p = tmp_path / "dvi.toml"
+    p.write_text(
+        'asset = "model.shop.fct_orders"\n'
+        "[source]\n"
+        'kind = "file"\n'
+        'before = "b.csv"\n'
+        'after = "a.csv"\n'
+        "[lineage]\n"
+        'manifest = "target/manifest.json"\n'
+        "[[changes]]\n"
+        'id = "pr-1"\n'
+        'targets = ["model.shop.stg_orders"]\n'
+        "timestamp = 2026-08-30T12:00:00Z\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.asset == "model.shop.fct_orders"
+    assert cfg.source.kind == "file"
+
+
+def test_load_config_missing_file_raises_dvi_error():
+    with pytest.raises(DviError):
+        load_config("does-not-exist.toml")
+
+
+def test_load_config_bad_toml_raises_dvi_error(tmp_path):
+    p = tmp_path / "bad.toml"
+    p.write_text("this = = broken", encoding="utf-8")
+    with pytest.raises(DviError):
+        load_config(p)

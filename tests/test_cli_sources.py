@@ -158,6 +158,28 @@ def test_missing_warehouse_database_raises_dvi_error(tmp_path):
         incident_from_config(cfg)
 
 
+def test_stale_change_timestamp_still_fires_incident(tmp_path):
+    # observed_at is anchored to the change timestamp, not wall-clock, so a
+    # PR open for 30 days must still fire — the old datetime.now(UTC)
+    # anchor would push this change's lead time past RCA's 24h window and
+    # silently return None.
+    _write_manifest(tmp_path / "manifest.json")
+    before, after = _frames()
+    before.write_csv(tmp_path / "before.csv")
+    after.write_csv(tmp_path / "after.csv")
+    cfg = _config(tmp_path, {
+        "kind": "file",
+        "before": str(tmp_path / "before.csv"),
+        "after": str(tmp_path / "after.csv"),
+    })
+    cfg.changes[0].timestamp = datetime.now(UTC) - timedelta(days=30)
+
+    inc = incident_from_config(cfg)
+
+    assert inc is not None
+    assert isinstance(inc.severity, str) and inc.severity != ""
+
+
 def test_warehouse_profiling_failure_raises_dvi_error(tmp_path):
     _write_manifest(tmp_path / "manifest.json")
     dbfile = tmp_path / "empty.duckdb"

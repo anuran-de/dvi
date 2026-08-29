@@ -27,7 +27,8 @@ runs:
         dvi analyze --config "${{ inputs.config }}" --output-dir "${{ inputs.output-dir }}"
         echo "exit_code=$?" >> "$GITHUB_OUTPUT"
     - name: Post sticky PR comment
-      if: ${{ github.event.pull_request.number != '' }}
+      if: ${{ github.event_name == 'pull_request' }}
+      continue-on-error: true
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}

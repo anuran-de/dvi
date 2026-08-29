@@ -97,6 +97,33 @@ def test_main_missing_config_returns_2(tmp_path):
     assert code == 2
 
 
+def test_main_bad_column_returns_2(tmp_path, capsys):
+    # before/after frames only have 'country'; a bogus column raises a polars
+    # error during analysis, which must map to exit 2 (not crash / not 1).
+    cfg = _setup(tmp_path)
+    text = (tmp_path / "dvi.toml").read_text(encoding="utf-8").replace(
+        'columns = ["country"]', 'columns = ["does_not_exist"]'
+    )
+    (tmp_path / "dvi.toml").write_text(text, encoding="utf-8")
+    out = tmp_path / "out"
+
+    code = main(["analyze", "--config", str(cfg), "--output-dir", str(out)])
+
+    assert code == 2
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_main_unwritable_output_dir_returns_2(tmp_path):
+    cfg = _setup(tmp_path)
+    blocked = tmp_path / "blocked"
+    blocked.write_text("not a directory", encoding="utf-8")
+    out = blocked / "sub"
+
+    code = main(["analyze", "--config", str(cfg), "--output-dir", str(out)])
+
+    assert code == 2
+
+
 def test_main_source_override(tmp_path):
     # Config points at a non-existent 'after'; override supplies the real one.
     cfg = _setup(tmp_path)

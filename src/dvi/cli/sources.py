@@ -10,12 +10,11 @@ shared, so the two producers cannot decide differently — the M5a seam.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dvi.calibration.model import LogisticModel
 from dvi.incidents import Incident
 from dvi.lineage import LineageGraph, load_dbt_manifest
 from dvi.pipeline import analyze_change, analyze_change_from_profiles
@@ -23,6 +22,9 @@ from dvi.rca import ChangeEvent
 from dvi.warehouse import DuckDBDialect, SqlProfileSource
 
 from .config import DviConfig, DviError
+
+if TYPE_CHECKING:
+    from dvi.calibration.model import LogisticModel
 
 _READERS = {
     ".parquet": pl.read_parquet,
@@ -89,22 +91,30 @@ def incident_from_config(config: DviConfig) -> Incident | None:
     """Analyze the configured before/after snapshot and return an incident."""
     lineage, changes = _lineage_and_changes(config)
     model = _load_model(config)
-    observed_at = datetime.now(UTC)
+    # Anchor the observation to the declared changes, not wall-clock: the
+    # before/after diff *is* the observation, and a fixed clock keeps re-runs
+    # deterministic and immune to the RCA lead window going stale as a PR ages.
+    observed_at = max(c.timestamp for c in config.changes)
 
     source = config.source
     if source.kind == "file":
         before = _read_frame(source.before)
         after = _read_frame(source.after)
-        return analyze_change(
-            asset=config.asset,
-            before=before,
-            after=after,
-            observed_at=observed_at,
-            lineage=lineage,
-            changes=changes,
-            columns=config.columns,
-            model=model,
-        )
+        try:
+            return analyze_change(
+                asset=config.asset,
+                before=before,
+                after=after,
+                observed_at=observed_at,
+                lineage=lineage,
+                changes=changes,
+                columns=config.columns,
+                model=model,
+            )
+        except DviError:
+            raise
+        except Exception as e:  # noqa: BLE001 - map any analysis failure to a clear error
+            raise DviError(f"analysis failed: {e}") from e
 
     # warehouse
     import duckdb
@@ -133,13 +143,18 @@ def incident_from_config(config: DviConfig) -> Incident | None:
     finally:
         con.close()
 
-    return analyze_change_from_profiles(
-        asset=config.asset,
-        before=before,
-        after=after,
-        observed_at=observed_at,
-        lineage=lineage,
-        changes=changes,
-        columns=config.columns,
-        model=model,
-    )
+    try:
+        return analyze_change_from_profiles(
+            asset=config.asset,
+            before=before,
+            after=after,
+            observed_at=observed_at,
+            lineage=lineage,
+            changes=changes,
+            columns=config.columns,
+            model=model,
+        )
+    except DviError:
+        raise
+    except Exception as e:  # noqa: BLE001 - map any analysis failure to a clear error
+        raise DviError(f"analysis failed: {e}") from e

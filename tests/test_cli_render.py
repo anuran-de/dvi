@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 
 from dvi.cli.render import render_json, render_markdown
-from dvi.incidents import Incident
+from dvi.incidents import BusinessImpact, Incident
+from dvi.lineage import Criticality, Exposure
 from dvi.rca import ChangeEvent, RootCauseCandidate
 
 
@@ -53,6 +54,49 @@ def test_json_incident_schema():
     assert js["incident"]["affected_assets"] == ["model.shop.fct_orders"]
     assert js["incident"]["confidence"] == 0.87
     assert js["generated_at"] == "2026-08-30T00:00:00+00:00"
+
+
+def _incident_with_business_impact():
+    exposure = Exposure(
+        unique_id="exposure.shop.revenue_dashboard",
+        name="Revenue Dashboard",
+        type="dashboard",
+        criticality=Criticality.HIGH,
+        owner="data-team",
+        url="",
+        depends_on=frozenset(),
+    )
+    impact = BusinessImpact(
+        exposures=(exposure,),
+        by_type={"dashboard": [exposure]},
+        max_criticality=Criticality.HIGH,
+    )
+    inc = _incident()
+    inc.business_impact = impact
+    return inc
+
+
+def test_markdown_renders_business_impact():
+    md = render_markdown(_incident_with_business_impact(), asset="model.shop.fct_orders",
+                         fail_on="high", gate_failed=True)
+    assert "Business impact:" in md
+    assert "Revenue Dashboard" in md
+    assert "HIGH" in md
+
+
+def test_json_renders_business_impact():
+    js = render_json(_incident_with_business_impact(), asset="model.shop.fct_orders",
+                     fail_on="high", gate_failed=True,
+                     generated_at=datetime(2026, 8, 30, tzinfo=UTC))
+    business = js["incident"]["business_impact"]
+    assert isinstance(business, dict)
+    assert business["max_criticality"] == "HIGH"
+    assert business["exposures"] == [{
+        "name": "Revenue Dashboard",
+        "type": "dashboard",
+        "criticality": "HIGH",
+        "owner": "data-team",
+    }]
 
 
 def test_json_no_incident_is_null():

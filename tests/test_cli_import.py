@@ -34,3 +34,8 @@ def test_pipeline_package_imports_first():
 def test_cli_sources_imports_first():
     result = _import_in_fresh_process("from dvi.cli.sources import incident_from_config")
     assert result.returncode == 0, result.stderr
+
+
+def test_cli_main_imports_first():
+    result = _import_in_fresh_process("import dvi.cli.main")
+    assert result.returncode == 0, result.stderr

@@ -49,28 +49,31 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(args.config)
         config = _apply_overrides(config, args)
         incident = incident_from_config(config)
+
+        failed = gate_failed(incident.severity if incident else None, config.gate.fail_on)
+        markdown = render_markdown(
+            incident, asset=config.asset, fail_on=config.gate.fail_on, gate_failed=failed
+        )
+        payload = render_json(
+            incident,
+            asset=config.asset,
+            fail_on=config.gate.fail_on,
+            gate_failed=failed,
+            generated_at=datetime.now(UTC),
+        )
+
+        out_dir = Path(args.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "dvi-report.md").write_text(markdown, encoding="utf-8")
+        (out_dir / "dvi-report.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except DviError as e:
         print(f"dvi: error: {e}", file=sys.stderr)
         return 2
+    except OSError as e:
+        print(f"dvi: error: could not write report to {args.output_dir}: {e}", file=sys.stderr)
+        return 2
 
-    failed = gate_failed(incident.severity if incident else None, config.gate.fail_on)
-    markdown = render_markdown(
-        incident, asset=config.asset, fail_on=config.gate.fail_on, gate_failed=failed
-    )
-    payload = render_json(
-        incident,
-        asset=config.asset,
-        fail_on=config.gate.fail_on,
-        gate_failed=failed,
-        generated_at=datetime.now(UTC),
-    )
-
-    out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "dvi-report.md").write_text(markdown, encoding="utf-8")
-    (out_dir / "dvi-report.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(markdown)
-
     return 1 if failed else 0
 
 

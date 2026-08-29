@@ -129,3 +129,46 @@ def test_missing_source_file_raises_dvi_error(tmp_path):
 
     with pytest.raises(DviError):
         incident_from_config(cfg)
+
+
+def test_unsupported_file_extension_raises_dvi_error(tmp_path):
+    _write_manifest(tmp_path / "manifest.json")
+    unsupported = tmp_path / "before.txt"
+    unsupported.write_text("country\nUK\n", encoding="utf-8")
+    cfg = _config(tmp_path, {
+        "kind": "file",
+        "before": str(unsupported),
+        "after": str(unsupported),
+    })
+
+    with pytest.raises(DviError):
+        incident_from_config(cfg)
+
+
+def test_missing_warehouse_database_raises_dvi_error(tmp_path):
+    _write_manifest(tmp_path / "manifest.json")
+    cfg = _config(tmp_path, {
+        "kind": "warehouse",
+        "database": str(tmp_path / "does_not_exist.duckdb"),
+        "before_table": "before_orders",
+        "after_table": "after_orders",
+    })
+
+    with pytest.raises(DviError):
+        incident_from_config(cfg)
+
+
+def test_warehouse_profiling_failure_raises_dvi_error(tmp_path):
+    _write_manifest(tmp_path / "manifest.json")
+    dbfile = tmp_path / "empty.duckdb"
+    con = duckdb.connect(str(dbfile))
+    con.close()
+    cfg = _config(tmp_path, {
+        "kind": "warehouse",
+        "database": str(dbfile),
+        "before_table": "before_orders",
+        "after_table": "after_orders",
+    })
+
+    with pytest.raises(DviError):
+        incident_from_config(cfg)

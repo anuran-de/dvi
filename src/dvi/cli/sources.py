@@ -15,6 +15,7 @@ from pathlib import Path
 
 import polars as pl
 
+from dvi.calibration.model import LogisticModel
 from dvi.incidents import Incident
 from dvi.lineage import LineageGraph, load_dbt_manifest
 from dvi.pipeline import analyze_change, analyze_change_from_profiles
@@ -74,7 +75,7 @@ def _lineage_and_changes(config: DviConfig) -> tuple[LineageGraph, list[ChangeEv
     return lineage, changes
 
 
-def _load_model(config: DviConfig):
+def _load_model(config: DviConfig) -> LogisticModel | None:
     if not config.gate.model:
         return None
     # Imported here (not at module top) to avoid any import-order cycle between

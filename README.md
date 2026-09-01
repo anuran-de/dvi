@@ -54,6 +54,8 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 
 ## Status
 
+**Web UI:** see [docs/frontend.md](docs/frontend.md) — `cd web && npm run dev`.
+
 > **M5b — CLI + GitHub Action: complete.** A `dvi` CLI and a composite GitHub
 > Action drive the whole pipeline off a single `dvi.toml`: config → source
 > adapter (file or warehouse) → detection/RCA/blast-radius → a severity-gated
@@ -229,7 +231,7 @@ DVI is built as a **walking skeleton** — the riskiest, most novel part (does s
 | **M4** ✅ | Blast-radius + external-asset lineage (dashboards/ML/APIs) | Business-level impact |
 | **M5a** ✅ | Warehouse pushdown profiling (DuckDB executed, Snowflake dialect + SQL-gen tests) + `analyze_change_from_profiles`, cross-engine detection-equivalence | Pushdown path is detection-equivalent to local profiling |
 | **M5b** ✅ | CLI (`dvi analyze`) + composite GitHub Action posting sticky PR reports, severity-gated | Real-user adoption path |
-| **M6** | Production-grade web UI + incident timeline | Operator experience |
+| **M6** ✅ | Editorial landing page + operator UI (dashboard, incident timeline, blast-radius graph), static-exported | Operator experience |
 
 Commodity signatures (null-explosion, cardinality, volume, duplicate-rate, schema/type) are slotted in where cheap.
 

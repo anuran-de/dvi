@@ -1,0 +1,29 @@
+[
+  {
+    "id": "critical-pricing-api",
+    "asset": "model.shop.fct_orders",
+    "severity": "critical",
+    "title": "Semantic change in country - deploy #482 (country normalization)",
+    "confidence": 0.9479039151157225,
+    "detectedAt": "2026-08-25T09:16:00",
+    "changeAt": "2026-08-25T09:14:00"
+  },
+  {
+    "id": "high-marketing-dashboard",
+    "asset": "model.marketing.dim_country",
+    "severity": "high",
+    "title": "Semantic change in country - PR #1187 (dim_country refactor)",
+    "confidence": 0.9654162691190278,
+    "detectedAt": "2026-08-25T06:32:00",
+    "changeAt": "2026-08-24T22:47:00"
+  },
+  {
+    "id": "medium-ledger-refactor",
+    "asset": "model.finance.stg_ledger",
+    "severity": "medium",
+    "title": "Semantic change in country - PR #1203 (ledger country cleanup)",
+    "confidence": 0.911948753931074,
+    "detectedAt": "2026-08-25T11:09:00",
+    "changeAt": "2026-08-25T11:03:00"
+  }
+]

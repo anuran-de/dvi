@@ -1,0 +1,34 @@
+{
+  "affectedAssets": [],
+  "asset": "model.marketing.dim_country",
+  "businessImpact": {
+    "exposures": [
+      {
+        "criticality": "HIGH",
+        "name": "campaign_dashboard",
+        "owner": "marketing-ops",
+        "type": "dashboard"
+      }
+    ],
+    "maxCriticality": "HIGH"
+  },
+  "changeAt": "2026-08-24T22:47:00",
+  "confidence": 0.9654162691190278,
+  "detectedAt": "2026-08-25T06:32:00",
+  "evidence": [
+    "Change 'PR #1187 (dim_country refactor)' was deployed 465 min before the first symptom.",
+    "'PR #1187 (dim_country refactor)' directly changed model.marketing.dim_country, where DVI observed: Value 'UK' (28.0% of the distribution) appears replaced by 'United Kingdom' (28.0%).",
+    "No corresponding change was observed upstream of the targeted asset(s)."
+  ],
+  "id": "high-marketing-dashboard",
+  "rootCause": {
+    "label": "PR #1187 (dim_country refactor)",
+    "targets": [
+      "model.marketing.dim_country"
+    ],
+    "timestamp": "2026-08-24T22:47:00"
+  },
+  "severity": "high",
+  "summary": "Suspected data incident from change 'PR #1187 (dim_country refactor)'. Value 'UK' (28.0% of the distribution) appears replaced by 'United Kingdom' (28.0%). on model.marketing.dim_country; 0 downstream asset(s) affected. Reaches 1 external consumer(s): 1 dashboard (worst: HIGH).",
+  "title": "Semantic change in country - PR #1187 (dim_country refactor)"
+}

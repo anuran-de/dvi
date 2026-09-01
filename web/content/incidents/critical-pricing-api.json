@@ -1,0 +1,42 @@
+{
+  "affectedAssets": [
+    "model.shop.revenue_daily"
+  ],
+  "asset": "model.shop.fct_orders",
+  "businessImpact": {
+    "exposures": [
+      {
+        "criticality": "CRITICAL",
+        "name": "pricing_api",
+        "owner": "platform",
+        "type": "application"
+      },
+      {
+        "criticality": "HIGH",
+        "name": "exec_dashboard",
+        "owner": "jane",
+        "type": "dashboard"
+      }
+    ],
+    "maxCriticality": "CRITICAL"
+  },
+  "changeAt": "2026-08-25T09:14:00",
+  "confidence": 0.9479039151157225,
+  "detectedAt": "2026-08-25T09:16:00",
+  "evidence": [
+    "Change 'deploy #482 (country normalization)' was deployed 2 min before the first symptom.",
+    "'deploy #482 (country normalization)' directly changed model.shop.fct_orders, where DVI observed: Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom' (20.0%).",
+    "No corresponding change was observed upstream of the targeted asset(s)."
+  ],
+  "id": "critical-pricing-api",
+  "rootCause": {
+    "label": "deploy #482 (country normalization)",
+    "targets": [
+      "model.shop.fct_orders"
+    ],
+    "timestamp": "2026-08-25T09:14:00"
+  },
+  "severity": "critical",
+  "summary": "Suspected data incident from change 'deploy #482 (country normalization)'. Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom' (20.0%). on model.shop.fct_orders; 1 downstream asset(s) affected. Reaches 2 external consumer(s): 1 application, 1 dashboard (worst: CRITICAL).",
+  "title": "Semantic change in country - deploy #482 (country normalization)"
+}

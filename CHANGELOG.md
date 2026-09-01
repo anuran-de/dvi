@@ -5,6 +5,15 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### M6 — Frontend (complete, 2026-09-01)
+
+- Editorial landing page and operator UI (incident dashboard, detail with
+  timeline, evidence, and blast-radius graph), built with Next.js + Tailwind
+  + Framer Motion, statically exported.
+- Fixtures generated from real pipeline runs via `scripts/export_fixtures.py`.
+- CI `web` job (typecheck, lint, unit, build, Playwright smoke) and a GitHub
+  Pages deploy workflow.
+
 ### M5b — CLI + GitHub Action (complete, 2026-08-30)
 
 A `dvi` CLI and a composite GitHub Action drive the pipeline from a single

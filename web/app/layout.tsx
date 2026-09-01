@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Newsreader, Geist, Geist_Mono } from 'next/font/google';
+import { PageTransition } from '@/components/motion/PageTransition';
 import './globals.css';
 
 const serif = Newsreader({ subsets: ['latin'], variable: '--font-serif', display: 'swap' });
@@ -14,7 +15,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <PageTransition>{children}</PageTransition>
+      </body>
     </html>
   );
 }

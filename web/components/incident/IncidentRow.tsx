@@ -7,7 +7,7 @@ export function IncidentRow({ incident }: { incident: IncidentSummary }) {
   return (
     <Link
       href={`/incidents/${incident.id}/`}
-      className="group grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-border px-4 py-4 transition-colors hover:bg-surface"
+      className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-border px-4 py-4 transition-colors hover:bg-surface"
     >
       <SeverityTag severity={incident.severity} />
       <div className="min-w-0">

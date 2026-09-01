@@ -47,6 +47,7 @@ export function IncidentList({ items }: { items: IncidentSummary[] }) {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-label="sort"
             className="rounded-sm border border-border bg-canvas px-2 py-1"
           >
             <option value="severity">severity</option>

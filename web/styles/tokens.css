@@ -1,0 +1,16 @@
+:root {
+  --canvas: #FAFAF7;
+  --surface: #F2F1EC;
+  --ink: #1A1A18;
+  --ink-muted: #6B6A63;
+  --border: #E3E1D9;
+  --accent: #1F3A5F;
+  --sev-low: #3F7A5E;
+  --sev-medium: #B07A2E;
+  --sev-high: #A23B34;
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 420ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}

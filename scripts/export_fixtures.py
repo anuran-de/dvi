@@ -28,10 +28,6 @@ from dvi.rca import ChangeEvent
 
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "web" / "content" / "incidents"
 
-# Fixed clock so fixtures are byte-for-byte deterministic across runs.
-_CHANGE_AT = datetime(2026, 8, 25, 9, 14)
-_OBSERVED_AT = datetime(2026, 8, 25, 9, 16)
-
 
 @dataclass(frozen=True)
 class Scenario:
@@ -40,6 +36,10 @@ class Scenario:
     change_id: str
     change_label: str
     lineage: LineageGraph
+    seed: int
+    uk_share: float
+    change_at: datetime
+    observed_at: datetime
 
 
 def _leaf_lineage(asset: str, exposures: list[Exposure]) -> LineageGraph:
@@ -91,6 +91,10 @@ def _scenarios() -> list[Scenario]:
                 ),
             ],
         ),
+        seed=7,
+        uk_share=0.20,
+        change_at=datetime(2026, 8, 25, 9, 14),
+        observed_at=datetime(2026, 8, 25, 9, 16),
     )
 
     # 2. HIGH: change is a leaf (base medium); a HIGH-criticality dashboard hangs
@@ -111,6 +115,10 @@ def _scenarios() -> list[Scenario]:
                 ),
             ],
         ),
+        seed=23,
+        uk_share=0.28,
+        change_at=datetime(2026, 8, 24, 22, 47),
+        observed_at=datetime(2026, 8, 25, 6, 32),
     )
 
     # 3. MEDIUM: change is a leaf (base medium) with NO exposures downstream ->
@@ -122,6 +130,10 @@ def _scenarios() -> list[Scenario]:
         "pr-1203",
         "PR #1203 (ledger country cleanup)",
         _leaf_lineage(s3_asset, []),
+        seed=41,
+        uk_share=0.10,
+        change_at=datetime(2026, 8, 25, 11, 3),
+        observed_at=datetime(2026, 8, 25, 11, 9),
     )
 
     return [s1, s2, s3]
@@ -171,22 +183,21 @@ def main(out_dir: Path = DEFAULT_OUT) -> list[dict]:
     out_dir.mkdir(parents=True, exist_ok=True)
     model = load_model()
 
-    # Real detection input, reused across scenarios: a silent category rename that
-    # passes every structural check. make_orders + inject_value_substitution are the
-    # same proven helpers scripts/demo.py uses.
-    before: pl.DataFrame = make_orders(n=1000, uk_share=0.2, seed=7)
-    after: pl.DataFrame = inject_value_substitution(before, "country", "UK", "United Kingdom")
-
     written: list[dict] = []
     for scenario in _scenarios():
+        # Real detection input, per scenario: a silent category rename that passes
+        # every structural check. make_orders + inject_value_substitution are the
+        # same proven helpers scripts/demo.py uses.
+        before: pl.DataFrame = make_orders(n=1000, uk_share=scenario.uk_share, seed=scenario.seed)
+        after: pl.DataFrame = inject_value_substitution(before, "country", "UK", "United Kingdom")
         change = ChangeEvent(
-            scenario.change_id, _CHANGE_AT, [scenario.asset], scenario.change_label
+            scenario.change_id, scenario.change_at, [scenario.asset], scenario.change_label
         )
         incident = analyze_change(
             asset=scenario.asset,
             before=before,
             after=after,
-            observed_at=_OBSERVED_AT,
+            observed_at=scenario.observed_at,
             lineage=scenario.lineage,
             changes=[change],
             columns=["country"],

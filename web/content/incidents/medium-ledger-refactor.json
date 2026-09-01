@@ -2,12 +2,12 @@
   "affectedAssets": [],
   "asset": "model.finance.stg_ledger",
   "businessImpact": null,
-  "changeAt": "2026-08-25T09:14:00",
-  "confidence": 0.9479039151157225,
-  "detectedAt": "2026-08-25T09:16:00",
+  "changeAt": "2026-08-25T11:03:00",
+  "confidence": 0.911948753931074,
+  "detectedAt": "2026-08-25T11:09:00",
   "evidence": [
-    "Change 'PR #1203 (ledger country cleanup)' was deployed 2 min before the first symptom.",
-    "'PR #1203 (ledger country cleanup)' directly changed model.finance.stg_ledger, where DVI observed: Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom' (20.0%).",
+    "Change 'PR #1203 (ledger country cleanup)' was deployed 6 min before the first symptom.",
+    "'PR #1203 (ledger country cleanup)' directly changed model.finance.stg_ledger, where DVI observed: Value 'UK' (10.0% of the distribution) appears replaced by 'United Kingdom' (10.0%).",
     "No corresponding change was observed upstream of the targeted asset(s)."
   ],
   "id": "medium-ledger-refactor",
@@ -16,9 +16,9 @@
     "targets": [
       "model.finance.stg_ledger"
     ],
-    "timestamp": "2026-08-25T09:14:00"
+    "timestamp": "2026-08-25T11:03:00"
   },
   "severity": "medium",
-  "summary": "Suspected data incident from change 'PR #1203 (ledger country cleanup)'. Value 'UK' (20.0% of the distribution) appears replaced by 'United Kingdom' (20.0%). on model.finance.stg_ledger; 0 downstream asset(s) affected.",
+  "summary": "Suspected data incident from change 'PR #1203 (ledger country cleanup)'. Value 'UK' (10.0% of the distribution) appears replaced by 'United Kingdom' (10.0%). on model.finance.stg_ledger; 0 downstream asset(s) affected.",
   "title": "Semantic change in country - PR #1203 (ledger country cleanup)"
 }

@@ -112,6 +112,19 @@ def test_all_null_numeric_column_has_no_numeric_stats():
     assert got.numeric is None
 
 
+def test_qualified_table_name_resolves_on_duckdb():
+    # A schema-qualified table must be quoted per-part ("main"."t") and still
+    # resolve against real DuckDB — quoting the whole dotted string would break it.
+    df = pl.DataFrame({"country": ["UK", "US", "US"]})
+    con = duckdb.connect()
+    _load(con, "t", df)
+
+    got = _source(con, "main.t").profile(["country"])["country"]
+
+    assert got.row_count == 3
+    assert got.distinct_count == 2
+
+
 def test_unknown_column_raises_valueerror():
     df = pl.DataFrame({"country": ["UK"]})
     con = duckdb.connect()

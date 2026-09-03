@@ -3,7 +3,7 @@ from dvi.warehouse import DuckDBDialect, SnowflakeDialect
 
 def test_duckdb_types_query():
     d = DuckDBDialect()
-    assert d.types_query("orders") == "DESCRIBE SELECT * FROM orders"
+    assert d.types_query("orders") == 'DESCRIBE SELECT * FROM "orders"'
 
 
 def test_duckdb_is_numeric_type():
@@ -22,7 +22,7 @@ def test_duckdb_non_numeric_aggregate_query():
         'SELECT COUNT(*) AS row_count, '
         'COUNT(*) - COUNT("country") AS null_count, '
         'COUNT(DISTINCT "country") AS distinct_count '
-        'FROM orders'
+        'FROM "orders"'
     )
 
 
@@ -43,7 +43,7 @@ def test_duckdb_numeric_aggregate_query():
         'QUANTILE_CONT(CASE WHEN isfinite("amount") THEN "amount" END, 0.5) AS p50, '
         'QUANTILE_CONT(CASE WHEN isfinite("amount") THEN "amount" END, 0.75) AS p75, '
         'QUANTILE_CONT(CASE WHEN isfinite("amount") THEN "amount" END, 0.95) AS p95 '
-        'FROM orders'
+        'FROM "orders"'
     )
 
 
@@ -52,7 +52,7 @@ def test_duckdb_topk_query():
     sql = d.topk_query("orders", "country", 50)
     assert sql == (
         'SELECT CAST("country" AS VARCHAR) AS value, COUNT(*) AS n '
-        'FROM orders WHERE "country" IS NOT NULL '
+        'FROM "orders" WHERE "country" IS NOT NULL '
         'GROUP BY "country" ORDER BY n DESC, value ASC LIMIT 50'
     )
 
@@ -65,7 +65,7 @@ def test_duckdb_identifier_quoting_escapes_embedded_quote():
 
 def test_snowflake_types_query():
     d = SnowflakeDialect()
-    assert d.types_query("orders") == "DESCRIBE TABLE orders"
+    assert d.types_query("orders") == 'DESCRIBE TABLE "orders"'
 
 
 def test_snowflake_is_numeric_type():
@@ -84,7 +84,7 @@ def test_snowflake_non_numeric_aggregate_query():
         'SELECT COUNT(*) AS row_count, '
         'COUNT(*) - COUNT("country") AS null_count, '
         'COUNT(DISTINCT "country") AS distinct_count '
-        'FROM orders'
+        'FROM "orders"'
     )
 
 
@@ -109,7 +109,7 @@ def test_snowflake_numeric_aggregate_query():
         f'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {cond}) AS p50, '
         f'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY {cond}) AS p75, '
         f'PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {cond}) AS p95 '
-        'FROM orders'
+        'FROM "orders"'
     )
 
 
@@ -118,6 +118,32 @@ def test_snowflake_topk_query_matches_shared_shape():
     sql = d.topk_query("orders", "country", 50)
     assert sql == (
         'SELECT CAST("country" AS VARCHAR) AS value, COUNT(*) AS n '
-        'FROM orders WHERE "country" IS NOT NULL '
+        'FROM "orders" WHERE "country" IS NOT NULL '
         'GROUP BY "country" ORDER BY n DESC, value ASC LIMIT 50'
     )
+
+
+def test_duckdb_qualified_table_quoted_per_part():
+    d = DuckDBDialect()
+    assert d.types_query("analytics.orders") == 'DESCRIBE SELECT * FROM "analytics"."orders"'
+    agg = d.aggregate_query("analytics.orders", "country", numeric=False)
+    assert agg.endswith('FROM "analytics"."orders"')
+    topk = d.topk_query("analytics.orders", "country", 10)
+    assert 'FROM "analytics"."orders" WHERE' in topk
+
+
+def test_snowflake_qualified_table_quoted_per_part():
+    d = SnowflakeDialect()
+    assert d.types_query("db.schema.orders") == 'DESCRIBE TABLE "db"."schema"."orders"'
+    agg = d.aggregate_query("db.schema.orders", "country", numeric=False)
+    assert agg.endswith('FROM "db"."schema"."orders"')
+
+
+def test_table_identifier_injection_rendered_inert():
+    # A malicious table name must be quoted into a single (unresolvable) identifier,
+    # not interpolated as raw SQL that could break out of the FROM clause.
+    d = DuckDBDialect()
+    sql = d.types_query('orders"; DROP TABLE users --')
+    assert sql == 'DESCRIBE SELECT * FROM "orders""; DROP TABLE users --"'
+    # The dangerous tokens are inside a quoted identifier, so no second statement exists.
+    assert not sql.rstrip().endswith("--")

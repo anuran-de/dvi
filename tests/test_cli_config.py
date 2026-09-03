@@ -37,6 +37,31 @@ def test_warehouse_config_parses():
     assert cfg.source.before_table == "prod.x"
 
 
+def test_warehouse_qualified_table_accepted():
+    cfg = DviConfig.model_validate(
+        _with_source({"kind": "warehouse", "database": "w.duckdb",
+                      "before_table": "analytics.public.orders",
+                      "after_table": "orders"})
+    )
+    assert cfg.source.before_table == "analytics.public.orders"
+
+
+@pytest.mark.parametrize("bad_table", [
+    "orders; DROP TABLE users --",
+    'orders" ; DROP TABLE users --',
+    "orders WHERE 1=1",
+    "",
+    "analytics..orders",
+    "1orders",
+])
+def test_warehouse_non_identifier_table_rejected(bad_table):
+    with pytest.raises(ValidationError):
+        DviConfig.model_validate(
+            _with_source({"kind": "warehouse", "database": "w.duckdb",
+                          "before_table": bad_table, "after_table": "orders"})
+        )
+
+
 def test_mixed_source_keys_rejected():
     # a file source carrying a warehouse-only key must fail (extra=forbid)
     with pytest.raises(ValidationError):

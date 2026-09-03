@@ -8,16 +8,35 @@ the CLI can map it to exit code 2 instead of a raw traceback.
 
 from __future__ import annotations
 
+import re
 import tomllib
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class DviError(Exception):
     """A clear, user-facing error (bad config, missing input, unresolved target)."""
+
+
+# A dot-separated SQL identifier: each part must be a plain, unquoted identifier
+# (letter/underscore start, then letters/digits/underscores/dollar). This rejects
+# whitespace, semicolons, quotes, comment markers and empty parts, so a table name
+# can never carry a SQL-injection payload into the generated warehouse queries.
+_IDENT_PART = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
+
+
+def _validate_table_identifier(value: str) -> str:
+    parts = value.split(".")
+    if not all(_IDENT_PART.fullmatch(part) for part in parts):
+        raise ValueError(
+            f"invalid table identifier {value!r}: each dot-separated part must be a "
+            "plain SQL identifier (letters, digits, underscore, dollar; not starting "
+            "with a digit)"
+        )
+    return value
 
 
 class FileSource(BaseModel):
@@ -33,6 +52,11 @@ class WarehouseSource(BaseModel):
     database: str
     before_table: str
     after_table: str
+
+    @field_validator("before_table", "after_table")
+    @classmethod
+    def _check_table_identifier(cls, value: str) -> str:
+        return _validate_table_identifier(value)
 
 
 class LineageConfig(BaseModel):

@@ -5,9 +5,15 @@
   --ink-muted: #6B6A63;
   --border: #E3E1D9;
   --accent: #1F3A5F;
+  --accent-soft: #E7ECF2;
+  --accent-line: #C7D2DE;
+  --canvas-raised: #FFFFFF;
   --sev-low: #3F7A5E;
+  --sev-low-soft: #E4EFE9;
   --sev-medium: #B07A2E;
+  --sev-medium-soft: #F3E9DA;
   --sev-high: #A23B34;
+  --sev-high-soft: #F3E1DF;
   --motion-fast: 160ms;
   --motion-base: 240ms;
   --motion-slow: 420ms;

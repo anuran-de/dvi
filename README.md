@@ -112,7 +112,7 @@ after  = "artifacts/fct_orders.pr.parquet"
 [lineage]
 manifest = "target/manifest.json"         # dbt manifest → models + exposures
 
-[[changes]]                               # one or more; RCA attributes to these
+[[changes]]                               # optional; RCA attributes to these too
 id = "pr-1234"
 label = "Refactor revenue rollup"
 targets = ["model.shop.stg_orders"]
@@ -125,6 +125,12 @@ fail_on = "high"                          # low | medium | high | critical
 ```bash
 dvi analyze --config dvi.toml --output-dir .dvi
 ```
+
+In CI, DVI auto-derives candidate change events from the commits in the PR
+range and maps changed dbt model files to the assets they touch, so
+`[[changes]]` is optional. Declare `[[changes]]` to add events git can't see
+(e.g. an upstream vendor load); explicit and derived events are unioned. If
+neither a declared nor a derived change exists, the run errors (exit 2).
 
 It writes `.dvi/dvi-report.md` + `.dvi/dvi-report.json` and sets the exit code:
 `0` (clean or below gate), `1` (gate tripped), `2` (could not run). Full
@@ -146,6 +152,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # DVI derives change events from commit history
       - uses: anuran-de/dvi@main
         with:
           config: dvi.toml
@@ -329,8 +337,6 @@ connectors come last. Every milestone below is complete and green in CI; see the
   downstream assets register via dbt exposures until then.
 - **Warehouses beyond DuckDB** (executed in CI) and **Snowflake** (dialect +
   SQL-gen tests, not CI-executed) — another warehouse needs a new `SqlDialect`.
-- **Auto-derived change events** — `[[changes]]` is declared explicitly in
-  `dvi.toml`; DVI does not yet infer changes from commit/deploy history.
 - **Multi-asset runs** — one `dvi analyze` run covers one asset.
 - **Forges beyond GitHub** and **any autonomous remediation**.
 

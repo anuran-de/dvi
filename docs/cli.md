@@ -31,11 +31,15 @@ after  = "artifacts/fct_orders.pr.parquet"
 [lineage]
 manifest = "target/manifest.json"         # dbt manifest → models + exposures
 
-[[changes]]                               # one or more; RCA attributes to these
+[[changes]]                               # optional; RCA attributes to these too
 id = "pr-1234"
 label = "Refactor revenue rollup"
 targets = ["model.shop.stg_orders"]       # must be nodes in the manifest
 timestamp = 2026-08-30T12:00:00Z          # required, ISO-8601
+
+[git]                                      # optional; controls auto-derived changes
+base = "main"                              # optional; defaults to $GITHUB_BASE_REF, else HEAD~1
+head = "HEAD"                              # optional; defaults to $GITHUB_SHA, else HEAD
 
 [gate]
 fail_on = "high"                          # low | medium | high | critical
@@ -59,6 +63,18 @@ path = ".dvi/incidents.db"                # record incidents for cross-run histo
   incidents dedupe and an asset's history is queryable over time. Omit the section
   to stay fully stateless. Recording never changes the exit code. See
   [Incident store](incident-store.md).
+- **Auto-derived change events** (optional `[git]`): in CI, DVI auto-derives
+  candidate change events from the commits in the PR range and maps changed
+  dbt model files to the assets they touch, so `[[changes]]` is optional.
+  Declare `[[changes]]` to add events git can't see (e.g. an upstream vendor
+  load); explicit and derived events are unioned and de-duplicated. The range
+  resolves as: explicit `[git] base`/`head` → `$GITHUB_BASE_REF`/`$GITHUB_SHA`
+  (set automatically on a GitHub Actions pull-request run) → default
+  `HEAD~1..HEAD`. If the combined set of change events is empty — none
+  declared and none derived — the run raises an error and exits `2`. Deriving
+  from history requires the checkout to have full history (see the GitHub
+  Action section below); a git problem (no repo, unknown ref) is best-effort
+  and simply contributes no derived events rather than failing the run.
 
 ## Run
 
@@ -95,6 +111,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # DVI derives change events from commit history
       - uses: anuran-de/dvi@main
         with:
           config: dvi.toml
@@ -103,7 +121,10 @@ jobs:
 The action installs DVI, runs `dvi analyze`, posts the report as a **sticky**
 comment (updated in place on each run, keyed off a hidden `<!-- dvi-report -->`
 marker) via the runner's `gh` CLI, and fails the check on the CLI's exit code.
-No third-party action is required.
+No third-party action is required. The checkout step must use `fetch-depth:
+0` (a full clone) — DVI derives candidate change events from the commit
+history in the PR range, and a shallow checkout leaves no history to derive
+from.
 
 The workflow shipped in this repo (`.github/workflows/dvi-example.yml`) guards
 the analysis step on the presence of a `dvi.toml`, so the job stays green until

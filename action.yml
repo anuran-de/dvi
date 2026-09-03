@@ -1,3 +1,13 @@
+# DVI derives candidate change events from the commits in the PR range (in
+# addition to any [[changes]] declared in dvi.toml), so the calling workflow's
+# checkout step must fetch full history — a shallow checkout leaves no commit
+# range to derive from:
+#
+#   - uses: actions/checkout@v4
+#     with:
+#       fetch-depth: 0        # DVI derives change events from commit history
+#   - uses: anuran-de/dvi@v1
+#
 name: "DVI semantic data-change report"
 description: "Run DVI on a pull request and post a semantic-data-change report."
 author: "Anuran De"

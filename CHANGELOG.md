@@ -5,6 +5,12 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+- Auto-derive candidate change events from git commit history in CI, mapping
+  changed dbt model files to lineage nodes; `[[changes]]` is now optional and
+  is unioned with derived events (#11). Requires `actions/checkout` with
+  `fetch-depth: 0`. A run with no declared or derived change now errors.
+
 ## [0.1.0] - 2026-09-04
 
 First public release. Everything below ships in `dvi 0.1.0` on PyPI.

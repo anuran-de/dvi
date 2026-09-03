@@ -1,7 +1,14 @@
 # DVI Web (M6)
 
 A static Next.js app: an editorial landing page plus an operator UI for
-browsing detected incidents. Light editorial / precise visual system.
+browsing detected incidents. Light editorial / precise visual system —
+one accent color, severity always paired with a text label, Newsreader
+serif + Geist sans, motion gated behind `prefers-reduced-motion`.
+
+The landing page's hero renders a real detected incident (via the data
+seam below, not hand-authored copy) next to the pitch, and a small
+animated motif shows the thesis directly: every structural check is
+green while the business number is silently wrong.
 
 ## Run locally
 
@@ -39,7 +46,9 @@ npm run build    # static export to web/out/
 
 `.github/workflows/pages.yml` publishes `web/out` to GitHub Pages on merge
 to `main` (base path `/dvi`). For Vercel, point it at `web/` with no base
-path.
+path — see [docs/deploy-vercel.md](deploy-vercel.md) for exact steps. The
+repo root's `vercel.json` makes the app buildable from Vercel even
+without changing the project's Root Directory setting.
 
 ## Tests
 

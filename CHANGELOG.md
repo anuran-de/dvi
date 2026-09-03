@@ -5,6 +5,21 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Web — visual redesign + Vercel deploy (2026-09-03)
+
+- Elevated the landing page: a stronger hero with a real detected-incident
+  specimen (sourced through the existing `lib/data.ts` seam, not
+  hand-authored), an animated "all checks green, business number wrong"
+  motif, and refreshed how-it-works / signatures / proof / footer CTA
+  sections — all gated behind `prefers-reduced-motion`.
+- Polished the operator UI: incident list header and row hover states, a
+  richer incident detail layout (raised cards, section kickers), and a
+  blast-radius graph with column labels, curved edges, and
+  severity-tinted exposure nodes.
+- Added a root `vercel.json` and [docs/deploy-vercel.md](docs/deploy-vercel.md)
+  so the app deploys to Vercel with no `basePath` (still env-gated via
+  `NEXT_PUBLIC_BASE_PATH`) while the GitHub Pages deploy is unaffected.
+
 ### Security — warehouse table identifier hardening (2026-09-03)
 
 - Table references in the generated warehouse SQL are now quoted per dotted part

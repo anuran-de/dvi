@@ -62,6 +62,30 @@ def test_warehouse_non_identifier_table_rejected(bad_table):
         )
 
 
+def test_store_defaults_to_none():
+    cfg = DviConfig.model_validate(
+        _with_source({"kind": "file", "before": "b.csv", "after": "a.csv"})
+    )
+    assert cfg.store is None
+
+
+def test_store_config_parses():
+    cfg = DviConfig.model_validate({
+        **_with_source({"kind": "file", "before": "b.csv", "after": "a.csv"}),
+        "store": {"path": ".dvi/incidents.db"},
+    })
+    assert cfg.store is not None
+    assert cfg.store.path == ".dvi/incidents.db"
+
+
+def test_store_config_rejects_unknown_key():
+    with pytest.raises(ValidationError):
+        DviConfig.model_validate({
+            **_with_source({"kind": "file", "before": "b.csv", "after": "a.csv"}),
+            "store": {"path": ".dvi/incidents.db", "backend": "postgres"},
+        })
+
+
 def test_mixed_source_keys_rejected():
     # a file source carrying a warehouse-only key must fail (extra=forbid)
     with pytest.raises(ValidationError):

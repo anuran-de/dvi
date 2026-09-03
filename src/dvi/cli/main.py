@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+from dvi.incidents import Incident
+from dvi.store import SqliteIncidentStore
 
 from .config import DviConfig, DviError, load_config
 from .gate import gate_failed
@@ -43,6 +47,25 @@ def _apply_overrides(config: DviConfig, args: argparse.Namespace) -> DviConfig:
     return config
 
 
+def _record_incident(config: DviConfig, incident: Incident) -> None:
+    """Persist the incident when a `[store]` is configured (opt-in, deterministic).
+
+    The run timestamp is the incident's ``detected_at`` (anchored to declared
+    change timestamps, never the wall clock), so re-running the same snapshot
+    upserts onto the same row instead of piling up duplicates.
+    """
+    if config.store is None:
+        return
+    run_at = incident.detected_at or incident.change_at
+    if run_at is None:  # an incident always carries a detection time; guard anyway
+        return
+    try:
+        with SqliteIncidentStore(config.store.path) as store:
+            store.record(incident, asset=config.asset, run_at=run_at)
+    except sqlite3.Error as e:
+        raise DviError(f"could not record incident to {config.store.path}: {e}") from e
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
@@ -66,6 +89,9 @@ def main(argv: list[str] | None = None) -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "dvi-report.md").write_text(markdown, encoding="utf-8")
         (out_dir / "dvi-report.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        if incident is not None:
+            _record_incident(config, incident)
     except DviError as e:
         print(f"dvi: error: {e}", file=sys.stderr)
         return 2

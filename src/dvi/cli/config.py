@@ -75,12 +75,20 @@ class GateConfig(BaseModel):
     model: bool = True
 
 
+class StoreConfig(BaseModel):
+    """Optional incident persistence. Present ⇒ each run records its incident."""
+
+    model_config = ConfigDict(extra="forbid")
+    path: str
+
+
 class DviConfig(BaseModel):
     asset: str
     source: FileSource | WarehouseSource = Field(discriminator="kind")
     lineage: LineageConfig
     changes: list[ChangeConfig] = Field(min_length=1)
     gate: GateConfig = Field(default_factory=GateConfig)
+    store: StoreConfig | None = None
     columns: list[str] | None = None
 
 

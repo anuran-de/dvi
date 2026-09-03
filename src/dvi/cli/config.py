@@ -70,6 +70,14 @@ class ChangeConfig(BaseModel):
     label: str = ""
 
 
+class GitConfig(BaseModel):
+    """Optional commit range for auto-deriving change events."""
+
+    model_config = ConfigDict(extra="forbid")
+    base: str | None = None
+    head: str | None = None
+
+
 class GateConfig(BaseModel):
     fail_on: Literal["low", "medium", "high", "critical"] = "high"
     model: bool = True
@@ -86,7 +94,8 @@ class DviConfig(BaseModel):
     asset: str
     source: FileSource | WarehouseSource = Field(discriminator="kind")
     lineage: LineageConfig
-    changes: list[ChangeConfig] = Field(min_length=1)
+    changes: list[ChangeConfig] = Field(default_factory=list)
+    git: GitConfig = Field(default_factory=GitConfig)
     gate: GateConfig = Field(default_factory=GateConfig)
     store: StoreConfig | None = None
     columns: list[str] | None = None

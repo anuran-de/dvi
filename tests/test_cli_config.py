@@ -17,6 +17,16 @@ def _with_source(source):
     return {**_BASE, "source": source}
 
 
+def _base_config(**overrides):
+    cfg = {
+        "asset": "model.shop.fct_orders",
+        "source": {"kind": "file", "before": "b.parquet", "after": "a.parquet"},
+        "lineage": {"manifest": "manifest.json"},
+    }
+    cfg.update(overrides)
+    return cfg
+
+
 def test_file_config_parses_with_defaults():
     cfg = DviConfig.model_validate(
         _with_source({"kind": "file", "before": "b.csv", "after": "a.csv"})
@@ -95,11 +105,10 @@ def test_mixed_source_keys_rejected():
         )
 
 
-def test_empty_changes_rejected():
-    bad = {**_BASE, "changes": [],
-           "source": {"kind": "file", "before": "b", "after": "a"}}
-    with pytest.raises(ValidationError):
-        DviConfig.model_validate(bad)
+def test_empty_changes_accepted():
+    cfg = DviConfig.model_validate({**_BASE, "changes": [],
+                                    "source": {"kind": "file", "before": "b", "after": "a"}})
+    assert cfg.changes == []
 
 
 def test_bad_fail_on_rejected():
@@ -141,3 +150,20 @@ def test_load_config_bad_toml_raises_dvi_error(tmp_path):
     p.write_text("this = = broken", encoding="utf-8")
     with pytest.raises(DviError):
         load_config(p)
+
+
+def test_changes_may_be_omitted():
+    cfg = DviConfig.model_validate(_base_config())
+    assert cfg.changes == []
+
+
+def test_git_block_defaults_to_none_base_and_head():
+    cfg = DviConfig.model_validate(_base_config())
+    assert cfg.git.base is None
+    assert cfg.git.head is None
+
+
+def test_git_block_accepts_base_and_head():
+    cfg = DviConfig.model_validate(_base_config(git={"base": "main", "head": "HEAD"}))
+    assert cfg.git.base == "main"
+    assert cfg.git.head == "HEAD"

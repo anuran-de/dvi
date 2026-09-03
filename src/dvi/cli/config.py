@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import tomllib
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -68,6 +68,16 @@ class ChangeConfig(BaseModel):
     targets: list[str] = Field(min_length=1)
     timestamp: datetime
     label: str = ""
+
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def _normalize_naive_utc(cls, value: datetime) -> datetime:
+        # Mirror dvi.changes.gitlog._to_naive_utc so declared and derived
+        # change timestamps are always naive UTC and comparable/max()-able
+        # together (the DVI spec's global "naive UTC" constraint).
+        if value.tzinfo is not None:
+            value = value.astimezone(UTC).replace(tzinfo=None)
+        return value
 
 
 class GitConfig(BaseModel):

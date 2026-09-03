@@ -291,3 +291,36 @@ def test_explicit_and_derived_duplicate_is_collapsed(tmp_path, monkeypatch):
     ids_targets = [(c.id, tuple(c.targets), c.timestamp) for c in changes]
     assert ids_targets.count(("abcdef1", ("model.shop.stg_orders",),
                               datetime(2026, 8, 25, 9, 50))) == 1
+
+
+def test_offset_aware_explicit_timestamp_unions_with_derived_without_typeerror(
+    tmp_path, monkeypatch
+):
+    # config.changes[].timestamp is normalized to naive UTC by ChangeConfig, so
+    # max(c.timestamp for c in changes) must not raise "can't compare
+    # offset-naive and offset-aware datetimes" against naive derived timestamps.
+    _manifest_with_paths(tmp_path / "manifest.json")
+    before = tmp_path / "b.parquet"
+    after = tmp_path / "a.parquet"
+    b, a = _frames()
+    b.write_parquet(before)
+    a.write_parquet(after)
+
+    config = DviConfig.model_validate({
+        "asset": "model.shop.fct_orders",
+        "columns": ["country"],
+        "source": {"kind": "file", "before": str(before), "after": str(after)},
+        "lineage": {"manifest": str(tmp_path / "manifest.json")},
+        "changes": [{
+            "id": "pr-1",
+            "targets": ["model.shop.stg_orders"],
+            "timestamp": "2026-08-25T11:50:00+02:00",
+        }],
+    })
+    monkeypatch.setattr(sources_mod, "collect_commits", lambda *a, **k: [
+        CommitRecord("abcdef1234", datetime(2026, 8, 25, 9, 50), "deploy stg",
+                     ("models/stg_orders.sql",)),
+    ])
+
+    incident = sources_mod.incident_from_config(config)
+    assert incident is not None

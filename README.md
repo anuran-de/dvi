@@ -55,8 +55,13 @@ because **nothing structural changed**. DVI is built specifically for it.
 
 ## Quick start
 
-Requires **Python 3.11+**. DVI isn't on PyPI yet ([#13](https://github.com/anuran-de/dvi/issues/13)),
-so install from source:
+Requires **Python 3.11+**.
+
+```bash
+pip install dvi          # provides the `dvi` command
+```
+
+Or from source, for hacking on DVI (see [Contributing](#contributing)):
 
 ```bash
 git clone https://github.com/anuran-de/dvi.git
@@ -320,8 +325,6 @@ connectors come last. Every milestone below is complete and green in CI; see the
 
 ### Explicitly not built yet
 
-- **PyPI package** ([#13](https://github.com/anuran-de/dvi/issues/13)) — install
-  from source until then.
 - **Automatic BI/ML lineage discovery** (Tableau/Looker/feature stores) —
   downstream assets register via dbt exposures until then.
 - **Warehouses beyond DuckDB** (executed in CI) and **Snowflake** (dialect +

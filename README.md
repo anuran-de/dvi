@@ -56,8 +56,8 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 ## Status
 
 **Web UI:** an editorial landing page + operator dashboard, static-exported and
-deployable to GitHub Pages or Vercel. See [docs/frontend.md](docs/frontend.md) —
-`cd dvi && npm run dev`.
+deployed to Vercel ([dvintelligence.vercel.app](https://dvintelligence.vercel.app)).
+See [docs/frontend.md](docs/frontend.md) — `cd dvi && npm run dev`.
 
 > **M5b — CLI + GitHub Action: complete.** A `dvi` CLI and a composite GitHub
 > Action drive the whole pipeline off a single `dvi.toml`: config → source

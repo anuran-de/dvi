@@ -1,0 +1,111 @@
+name: Release
+
+# Tag a commit `vX.Y.Z` (matching the version in pyproject.toml) to build the
+# package, publish it to PyPI via trusted publishing (OIDC — no stored token),
+# and cut a GitHub Release with notes from CHANGELOG.md.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches pyproject version
+        id: version
+        run: |
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$PYPROJECT_VERSION" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+              echo "::error::Tag v$TAG_VERSION does not match pyproject version $PYPROJECT_VERSION"
+              exit 1
+            fi
+          fi
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check dist/*
+
+      - name: Smoke-test the wheel (clean install + console script)
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/dvi --help
+          /tmp/smoke/bin/python -c "from dvi.calibration import load_model; load_model(); print('runtime model data OK')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dvi
+    permissions:
+      id-token: write        # trusted publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: [build, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # create the release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          python - "${{ needs.build.outputs.version }}" > RELEASE_NOTES.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          # Prefer a `## [<version>]` section; fall back to the first `## ` section.
+          sections = re.split(r"^## ", text, flags=re.MULTILINE)[1:]
+          chosen = None
+          for s in sections:
+              head = s.splitlines()[0]
+              if version in head:
+                  chosen = s
+                  break
+          if chosen is None and sections:
+              chosen = sections[0]
+          body = "\n".join(chosen.splitlines()[1:]).strip() if chosen else ""
+          print(body or f"Release v{version}.")
+          PY
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "DVI ${GITHUB_REF_NAME}" \
+            --notes-file RELEASE_NOTES.md

@@ -11,6 +11,20 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Anuran De" }]
 keywords = ["data-observability", "data-lineage", "root-cause-analysis", "data-quality", "semantic-drift"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Typing :: Typed",
+]
 
 dependencies = [
     "polars>=1.0",
@@ -29,6 +43,10 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/anuran-de/dvi"
 Repository = "https://github.com/anuran-de/dvi"
+Documentation = "https://github.com/anuran-de/dvi/tree/main/docs"
+Changelog = "https://github.com/anuran-de/dvi/blob/main/CHANGELOG.md"
+Issues = "https://github.com/anuran-de/dvi/issues"
+"Live demo" = "https://dvintelligence.vercel.app"
 
 [project.scripts]
 dvi = "dvi.cli.main:main"
@@ -37,6 +55,7 @@ dvi = "dvi.cli.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"dvi" = ["py.typed"]
 "dvi.calibration" = ["*.json"]
 
 [tool.pytest.ini_options]

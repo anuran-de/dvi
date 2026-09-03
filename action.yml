@@ -1,5 +1,9 @@
 name: "DVI semantic data-change report"
 description: "Run DVI on a pull request and post a semantic-data-change report."
+author: "Anuran De"
+branding:
+  icon: "activity"
+  color: "purple"
 inputs:
   config:
     description: "Path to the dvi.toml config file."

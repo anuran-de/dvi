@@ -5,6 +5,10 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-04
+
+First public release. Everything below ships in `dvi 0.1.0` on PyPI.
+
 ### Incident store — persist history across runs (2026-09-03)
 
 - New `dvi.store` package: an `IncidentStore` interface with a default local

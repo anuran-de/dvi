@@ -43,6 +43,7 @@ DVI is a self-hostable intelligence layer that sits **on top of** your existing 
 5. **Names the business-level impact** — dbt exposures downstream of an incident (dashboards, ML features, applications) are named by type, and a business-critical consumer can escalate severity into a new `critical` tier — only for a *material* change, never for an immaterial flicker.
 
 - **Warehouse pushdown profiling** — step 1 can also run **inside the warehouse**: a `SqlDialect` (DuckDB, Snowflake) computes the `ColumnProfile` in SQL and only the compact profile comes back, so profiling a billion-row table moves a handful of aggregates, not the table. See [Warehouse pushdown profiling](docs/warehouse-pushdown.md).
+- **Incident history** — detection is stateless by default, but an optional local incident store gives incidents a stable identity so recurrences dedupe and an asset's history is queryable over time. Opt in with a `[store]` section in `dvi.toml`. See [Incident store](docs/incident-store.md).
 
 ## Design principles
 

@@ -40,6 +40,9 @@ timestamp = 2026-08-30T12:00:00Z          # required, ISO-8601
 [gate]
 fail_on = "high"                          # low | medium | high | critical
 model = true                              # attach calibrated confidence
+
+[store]                                    # optional; omit to stay stateless
+path = ".dvi/incidents.db"                # record incidents for cross-run history
 ```
 
 - **File source:** `.parquet`, `.csv`, `.ndjson`, read natively by polars.
@@ -51,6 +54,11 @@ model = true                              # attach calibrated confidence
   (spaces, quotes, semicolons, comment markers) is rejected at config parse. The
   generated SQL also quotes each dotted part (`"schema"."table"`), so a table name
   can never inject SQL into a profiling query.
+- **Incident store** (optional `[store]`): when set, each run that finds an
+  incident records it to a local SQLite file with a stable identity, so recurring
+  incidents dedupe and an asset's history is queryable over time. Omit the section
+  to stay fully stateless. Recording never changes the exit code. See
+  [Incident store](incident-store.md).
 
 ## Run
 

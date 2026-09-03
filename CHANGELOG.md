@@ -5,6 +5,22 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Incident store — persist history across runs (2026-09-03)
+
+- New `dvi.store` package: an `IncidentStore` interface with a default local
+  SQLite backend (stdlib only, no new dependencies).
+- Incidents get a deterministic identity (asset + primary signature + change
+  event), so re-running the same snapshot upserts onto one row — occurrences and
+  last-seen advance, first-seen stays put — instead of duplicating.
+- Query API: `history(asset)` (newest first), `get(identity)`, and `prune(before=…)`
+  for retention.
+- `dvi analyze` records incidents when an optional `[store]` section is present in
+  `dvi.toml`; with no section, behavior is unchanged and no database is written.
+  Recording never alters the exit code. Run timestamp is the incident's
+  detection time (anchored to declared change timestamps, not the wall clock), so
+  records are deterministic.
+- Docs: [Incident store](docs/incident-store.md). Addresses issue #9.
+
 ### Security — warehouse table identifier hardening (2026-09-03)
 
 - Table references in the generated warehouse SQL are now quoted per dotted part

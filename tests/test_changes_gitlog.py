@@ -66,3 +66,18 @@ def test_unknown_ref_returns_empty_best_effort(tmp_path):
     _init_repo(tmp_path)
     _commit(tmp_path, "a.sql", "first", "2026-08-25T09:50:00+00:00")
     assert collect_commits(base="does-not-exist", head="HEAD", cwd=tmp_path) == []
+
+
+def test_malformed_committer_date_returns_empty_best_effort(tmp_path, monkeypatch):
+    # git itself succeeds, but emits a committer-date field that
+    # datetime.fromisoformat cannot parse. Parsing must degrade to []
+    # rather than raising, per the best-effort contract.
+    class FakeResult:
+        stdout = "\x1eabc123\x1fnot-a-date\x1fbad commit\nfile.txt\n"
+
+    def fake_run(*args, **kwargs):
+        return FakeResult()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert collect_commits(base=None, head="HEAD", cwd=tmp_path) == []

@@ -57,6 +57,6 @@ def collect_commits(base: str | None, head: str, cwd: Path) -> list[CommitRecord
             text=True,
             check=True,
         )
-    except (OSError, subprocess.CalledProcessError):
+        return _parse(result.stdout)
+    except (OSError, subprocess.CalledProcessError, ValueError):
         return []
-    return _parse(result.stdout)

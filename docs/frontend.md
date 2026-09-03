@@ -41,26 +41,20 @@ npm run build    # static export to dvi/out/
 ```
 
 The app is a static export (`output: 'export'`), so it can be hosted anywhere
-that serves files. `basePath` is env-gated via `NEXT_PUBLIC_BASE_PATH`:
-unset = served at the domain root, set = served under a sub-path.
+that serves files. It is served at the domain **root** (no base path).
 
-### GitHub Pages
+### Vercel (production host)
 
-`.github/workflows/pages.yml` publishes `dvi/out` to GitHub Pages on merge to
-`main` with `NEXT_PUBLIC_BASE_PATH=/dvi` (the repo sub-path). No action needed
-beyond enabling Pages (Settings → Pages → Source: GitHub Actions).
-
-### Vercel
-
-Vercel serves the app at the domain **root**, so leave `NEXT_PUBLIC_BASE_PATH`
-**unset** there (do not set it). `dvi/vercel.json` pins the Next.js framework
-preset and `trailingSlash`. Two ways to deploy:
+Live at **[dvintelligence.vercel.app](https://dvintelligence.vercel.app)**.
+`dvi/vercel.json` pins the Next.js framework preset and `trailingSlash`. Two
+ways to deploy:
 
 **A. Connect the GitHub repo (recommended, auto-deploys on push):**
 1. In the Vercel dashboard: *New Project* → import `anuran-de/dvi`.
-2. Set **Root Directory** to `dvi`.
+2. Set **Root Directory** to `dvi` (must match this folder, or Git builds fail
+   with *"Couldn't find any pages or app directory"*).
 3. Framework preset auto-detects **Next.js**; leave build/output defaults
-   (Vercel handles the static export). Do **not** add `NEXT_PUBLIC_BASE_PATH`.
+   (Vercel handles the static export).
 4. Deploy. Every push to `main` publishes a production deployment; PRs get
    preview URLs.
 
@@ -71,9 +65,6 @@ cd dvi
 vercel            # first run links/creates the project (accept root = dvi)
 vercel --prod     # promote to production
 ```
-
-GitHub Pages and Vercel coexist: the base-path difference is the only knob,
-and it is environment-driven, so the same commit deploys correctly to both.
 
 ## Tests
 

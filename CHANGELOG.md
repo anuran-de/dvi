@@ -5,6 +5,17 @@ All notable changes to DVI are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Security — warehouse table identifier hardening (2026-09-03)
+
+- Table references in the generated warehouse SQL are now quoted per dotted part
+  (`schema.table` → `"schema"."table"`) in `aggregate_query`, `topk_query`, and
+  both dialects' `types_query`, trapping any payload inside a single quoted
+  identifier instead of interpolating it as raw SQL.
+- `WarehouseSource.before_table` / `after_table` are validated at config parse:
+  each dot-separated part must be a plain SQL identifier, so a malicious table
+  name (e.g. `orders; DROP TABLE users --`) is rejected before any SQL is built.
+- Closes the SQL-injection surface tracked in issue #6.
+
 ### M6 — Frontend (complete, 2026-09-01)
 
 - Editorial landing page and operator UI (incident dashboard, detail with

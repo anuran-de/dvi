@@ -45,6 +45,12 @@ model = true                              # attach calibrated confidence
 - **File source:** `.parquet`, `.csv`, `.ndjson`, read natively by polars.
 - **Warehouse source:** a DuckDB database file DVI opens read-only; profiling is
   pushed into SQL (the M5a path). See *Snowflake* below.
+- **Table identifiers** (`before_table` / `after_table`) must be plain SQL
+  identifiers, optionally dot-qualified (`schema.table`, `db.schema.table`) —
+  letters, digits, underscore and `$`, not starting with a digit. Anything else
+  (spaces, quotes, semicolons, comment markers) is rejected at config parse. The
+  generated SQL also quotes each dotted part (`"schema"."table"`), so a table name
+  can never inject SQL into a profiling query.
 
 ## Run
 

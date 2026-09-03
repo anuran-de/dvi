@@ -33,6 +33,16 @@ class SqlDialect(ABC):
         """Double-quote an identifier, escaping embedded double quotes."""
         return '"' + ident.replace('"', '""') + '"'
 
+    @staticmethod
+    def _quote_table(table: str) -> str:
+        """Quote a possibly dotted table reference, one part at a time.
+
+        ``analytics.orders`` becomes ``"analytics"."orders"`` so a schema-qualified
+        name still resolves, while any injection payload is trapped inside a single
+        quoted identifier instead of being interpolated as raw SQL.
+        """
+        return ".".join(SqlDialect._quote(part) for part in table.split("."))
+
     def is_numeric_type(self, type_string: str) -> bool:
         """Classify a dialect type string as numeric (drives numeric stats)."""
         base = type_string.split("(")[0].strip().upper()
@@ -70,13 +80,13 @@ class SqlDialect(ABC):
                 self._quantile_term(cond, name, frac)
                 for name, frac in QUANTILES
             ]
-        return f"SELECT {', '.join(parts)} FROM {table}"
+        return f"SELECT {', '.join(parts)} FROM {self._quote_table(table)}"
 
     def topk_query(self, table: str, column: str, top_k: int) -> str:
         qcol = self._quote(column)
         return (
             f"SELECT CAST({qcol} AS VARCHAR) AS value, COUNT(*) AS n "
-            f"FROM {table} WHERE {qcol} IS NOT NULL "
+            f"FROM {self._quote_table(table)} WHERE {qcol} IS NOT NULL "
             f"GROUP BY {qcol} ORDER BY n DESC, value ASC LIMIT {top_k}"
         )
 
@@ -103,7 +113,7 @@ class DuckDBDialect(SqlDialect):
     )
 
     def types_query(self, table: str) -> str:
-        return f"DESCRIBE SELECT * FROM {table}"
+        return f"DESCRIBE SELECT * FROM {self._quote_table(table)}"
 
     def _finite_predicate(self, qcol: str) -> str:
         return f"isfinite({qcol})"
@@ -123,7 +133,7 @@ class SnowflakeDialect(SqlDialect):
     )
 
     def types_query(self, table: str) -> str:
-        return f"DESCRIBE TABLE {table}"
+        return f"DESCRIBE TABLE {self._quote_table(table)}"
 
     def _finite_predicate(self, qcol: str) -> str:
         # Snowflake lacks isfinite(); exclude the special FLOAT values instead.

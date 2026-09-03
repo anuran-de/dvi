@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/anuran-de/dvi/tree/main/docs
+    about: CLI reference, architecture, warehouse pushdown, and the incident store.
+  - name: Live demo
+    url: https://dvintelligence.vercel.app
+    about: See the operator UI running on real pipeline output.

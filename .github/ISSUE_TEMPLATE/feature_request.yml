@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new capability or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything large (a new signature, warehouse dialect, or connector),
+        this issue is the place to agree on the design **before** code is written.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The concrete situation you're stuck in today. What can't you do?
+      placeholder: I run DVI against BigQuery, but there's no dialect for it…
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like DVI to do. A rough API/config sketch is welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you've tried, or other designs you weighed.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits DVI's principles
+      description: >
+        DVI stays deterministic, explainable, and dependency-light (see
+        CONTRIBUTING.md). Tick any that apply — it's fine if you're unsure.
+      options:
+        - label: This can be done deterministically (no LLM / unseeded randomness in the decision path)
+        - label: This adds no new required runtime dependency (or the PR will justify one)

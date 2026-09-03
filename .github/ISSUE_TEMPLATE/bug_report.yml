@@ -1,0 +1,53 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. A minimal reproduction is the
+        single most helpful thing you can include.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did DVI do instead?
+      placeholder: DVI reported X, but the change was actually Y…
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Ideally a minimal `dvi.toml` / snippet plus the command you ran. If the
+        data is sensitive, a small synthetic sample that still triggers it is
+        perfect.
+      placeholder: |
+        1. dvi.toml with …
+        2. dvi analyze --config dvi.toml
+        3. …
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output / report
+      description: The relevant part of the console output, `dvi-report.md`, or a traceback.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: DVI version / commit
+      description: Output of `dvi --version` if available, or the git commit SHA.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version and OS (and warehouse, if using a warehouse source).
+      placeholder: Python 3.12, macOS 14, DuckDB source
+    validations:
+      required: true

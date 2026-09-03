@@ -2,7 +2,7 @@ name: Deploy web
 on:
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/pages.yml']
+    paths: ['dvi/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,21 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: dvi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: dvi/package-lock.json
       - run: npm ci
       - run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /dvi
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web/out
+          path: dvi/out
   deploy:
     needs: build
     runs-on: ubuntu-latest

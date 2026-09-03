@@ -26,7 +26,7 @@ from dvi.lineage import Criticality, Exposure, LineageGraph
 from dvi.pipeline import analyze_change
 from dvi.rca import ChangeEvent
 
-DEFAULT_OUT = Path(__file__).resolve().parent.parent / "web" / "content" / "incidents"
+DEFAULT_OUT = Path(__file__).resolve().parent.parent / "dvi" / "content" / "incidents"
 
 
 @dataclass(frozen=True)

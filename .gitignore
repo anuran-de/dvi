@@ -39,3 +39,6 @@ Thumbs.db
 # Node (frontend, added at M6)
 node_modules/
 frontend/dist/
+
+# Claude Code agent worktrees / local state
+.claude/

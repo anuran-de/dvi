@@ -60,6 +60,24 @@ class LineageGraph:
             return None
         return self._g.nodes[node].get("kind")
 
+    def nodes_for_file(self, path: str) -> set[str]:
+        """Lineage nodes whose dbt source file is ``path``.
+
+        Matches the manifest's ``original_file_path`` either exactly or as a
+        trailing path segment, so a dbt project nested under a repo subdirectory
+        still resolves. Separators are normalized to ``/``.
+        """
+        norm = path.replace("\\", "/").lstrip("./")
+        out: set[str] = set()
+        for node, attrs in self._g.nodes(data=True):
+            fp = attrs.get("original_file_path")
+            if not fp:
+                continue
+            fp = fp.replace("\\", "/")
+            if norm == fp or norm.endswith("/" + fp):
+                out.add(node)
+        return out
+
     def _reachable(self, assets: set[str]) -> set[str]:
         out: set[str] = set()
         for asset in assets:
@@ -102,6 +120,7 @@ def load_dbt_manifest(manifest: dict | str | Path) -> LineageGraph:
             unique_id,
             kind="data",
             resource_type=node.get("resource_type"),
+            original_file_path=node.get("original_file_path"),
         )
     for unique_id, node in nodes.items():
         for dependency in node.get("depends_on", {}).get("nodes", []):

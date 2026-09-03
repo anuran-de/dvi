@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import tomllib
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -69,6 +69,24 @@ class ChangeConfig(BaseModel):
     timestamp: datetime
     label: str = ""
 
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def _normalize_naive_utc(cls, value: datetime) -> datetime:
+        # Mirror dvi.changes.gitlog._to_naive_utc so declared and derived
+        # change timestamps are always naive UTC and comparable/max()-able
+        # together (the DVI spec's global "naive UTC" constraint).
+        if value.tzinfo is not None:
+            value = value.astimezone(UTC).replace(tzinfo=None)
+        return value
+
+
+class GitConfig(BaseModel):
+    """Optional commit range for auto-deriving change events."""
+
+    model_config = ConfigDict(extra="forbid")
+    base: str | None = None
+    head: str | None = None
+
 
 class GateConfig(BaseModel):
     fail_on: Literal["low", "medium", "high", "critical"] = "high"
@@ -86,7 +104,8 @@ class DviConfig(BaseModel):
     asset: str
     source: FileSource | WarehouseSource = Field(discriminator="kind")
     lineage: LineageConfig
-    changes: list[ChangeConfig] = Field(min_length=1)
+    changes: list[ChangeConfig] = Field(default_factory=list)
+    git: GitConfig = Field(default_factory=GitConfig)
     gate: GateConfig = Field(default_factory=GateConfig)
     store: StoreConfig | None = None
     columns: list[str] | None = None

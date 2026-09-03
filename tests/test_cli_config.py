@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -15,6 +17,16 @@ _BASE = {
 
 def _with_source(source):
     return {**_BASE, "source": source}
+
+
+def _base_config(**overrides):
+    cfg = {
+        "asset": "model.shop.fct_orders",
+        "source": {"kind": "file", "before": "b.parquet", "after": "a.parquet"},
+        "lineage": {"manifest": "manifest.json"},
+    }
+    cfg.update(overrides)
+    return cfg
 
 
 def test_file_config_parses_with_defaults():
@@ -95,11 +107,10 @@ def test_mixed_source_keys_rejected():
         )
 
 
-def test_empty_changes_rejected():
-    bad = {**_BASE, "changes": [],
-           "source": {"kind": "file", "before": "b", "after": "a"}}
-    with pytest.raises(ValidationError):
-        DviConfig.model_validate(bad)
+def test_empty_changes_accepted():
+    cfg = DviConfig.model_validate({**_BASE, "changes": [],
+                                    "source": {"kind": "file", "before": "b", "after": "a"}})
+    assert cfg.changes == []
 
 
 def test_bad_fail_on_rejected():
@@ -141,3 +152,84 @@ def test_load_config_bad_toml_raises_dvi_error(tmp_path):
     p.write_text("this = = broken", encoding="utf-8")
     with pytest.raises(DviError):
         load_config(p)
+
+
+def test_changes_may_be_omitted():
+    cfg = DviConfig.model_validate(_base_config())
+    assert cfg.changes == []
+
+
+def test_git_block_defaults_to_none_base_and_head():
+    cfg = DviConfig.model_validate(_base_config())
+    assert cfg.git.base is None
+    assert cfg.git.head is None
+
+
+def test_git_block_accepts_base_and_head():
+    cfg = DviConfig.model_validate(_base_config(git={"base": "main", "head": "HEAD"}))
+    assert cfg.git.base == "main"
+    assert cfg.git.head == "HEAD"
+
+
+def test_change_timestamp_offset_string_normalized_to_naive_utc():
+    cfg = DviConfig.model_validate({
+        **_base_config(),
+        "changes": [{
+            "id": "pr-1",
+            "targets": ["model.shop.stg_orders"],
+            "timestamp": "2026-08-25T11:50:00+02:00",
+        }],
+    })
+    ts = cfg.changes[0].timestamp
+    assert ts == datetime(2026, 8, 25, 9, 50, 0)
+    assert ts.tzinfo is None
+
+
+def test_change_timestamp_z_suffix_normalized_to_naive_utc():
+    cfg = DviConfig.model_validate({
+        **_base_config(),
+        "changes": [{
+            "id": "pr-1",
+            "targets": ["model.shop.stg_orders"],
+            "timestamp": "2026-08-30T12:00:00Z",
+        }],
+    })
+    ts = cfg.changes[0].timestamp
+    assert ts == datetime(2026, 8, 30, 12, 0, 0)
+    assert ts.tzinfo is None
+
+
+def test_change_timestamp_toml_offset_datetime_normalized_to_naive_utc(tmp_path):
+    p = tmp_path / "dvi.toml"
+    p.write_text(
+        'asset = "model.shop.fct_orders"\n'
+        "[source]\n"
+        'kind = "file"\n'
+        'before = "b.csv"\n'
+        'after = "a.csv"\n'
+        "[lineage]\n"
+        'manifest = "target/manifest.json"\n'
+        "[[changes]]\n"
+        'id = "pr-1"\n'
+        'targets = ["model.shop.stg_orders"]\n'
+        "timestamp = 2026-08-25T11:50:00+02:00\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    ts = cfg.changes[0].timestamp
+    assert ts == datetime(2026, 8, 25, 9, 50, 0)
+    assert ts.tzinfo is None
+
+
+def test_change_timestamp_naive_input_unchanged():
+    cfg = DviConfig.model_validate({
+        **_base_config(),
+        "changes": [{
+            "id": "pr-1",
+            "targets": ["model.shop.stg_orders"],
+            "timestamp": "2026-08-25T09:50:00",
+        }],
+    })
+    ts = cfg.changes[0].timestamp
+    assert ts == datetime(2026, 8, 25, 9, 50, 0)
+    assert ts.tzinfo is None

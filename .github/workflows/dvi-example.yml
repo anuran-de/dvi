@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # DVI derives change events from commit history
       # Only run DVI when the repo actually declares a config. This keeps the
       # example safe to drop in before `dvi.toml` exists (the job stays green
       # instead of failing on a missing config) and lets this workflow live in

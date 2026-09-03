@@ -9,7 +9,7 @@ test('landing renders and links to incidents', async ({ page }) => {
 
 test('dashboard lists incidents and opens a detail', async ({ page }) => {
   await page.goto('/incidents/');
-  const firstRow = page.locator('a[href^="/incidents/"]').first();
+  const firstRow = page.locator('[data-incident-link]').first();
   await expect(firstRow).toBeVisible();
   await firstRow.click();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

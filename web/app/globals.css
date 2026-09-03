@@ -3,11 +3,43 @@
 @tailwind components;
 @tailwind utilities;
 
-html { -webkit-font-smoothing: antialiased; }
+html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
 body { background: var(--canvas); color: var(--ink); }
 ::selection { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
+/* Visible, accent-keyed focus for keyboard users across the whole surface. */
+:where(a, button, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* A whisper-fine editorial grid — texture without weight. Sits behind hero/CTA
+   bands via `.bg-grid`; never over content contrast. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 55%, transparent 100%);
+}
+
+/* Animated underline that grows from the left on hover/focus. */
+.link-underline {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size var(--motion-base) var(--ease-out);
+}
+.link-underline:hover,
+.link-underline:focus-visible { background-size: 100% 1px; }
+
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .link-underline { transition: none; }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;

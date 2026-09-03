@@ -29,14 +29,16 @@ export function IncidentList({ items }: { items: IncidentSummary[] }) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-2 font-mono text-xs">
+      <div className="mb-5 flex flex-wrap items-center gap-2 font-mono text-xs">
         {SEVERITIES.map((s) => (
           <button
             key={s}
             onClick={() => setSeverity(s)}
             aria-pressed={severity === s}
-            className={`rounded-sm border px-2 py-1 uppercase tracking-wide transition-colors ${
-              severity === s ? 'border-accent text-accent' : 'border-border text-ink-muted hover:text-ink'
+            className={`rounded-sm border px-2.5 py-1 uppercase tracking-wide transition-colors ${
+              severity === s
+                ? 'border-accent bg-accent text-canvas'
+                : 'border-border text-ink-muted hover:border-ink hover:text-ink'
             }`}
           >
             {s}
@@ -48,7 +50,7 @@ export function IncidentList({ items }: { items: IncidentSummary[] }) {
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             aria-label="sort"
-            className="rounded-sm border border-border bg-canvas px-2 py-1"
+            className="rounded-sm border border-border bg-canvas px-2 py-1 transition-colors hover:border-ink"
           >
             <option value="severity">severity</option>
             <option value="confidence">confidence</option>
@@ -57,9 +59,11 @@ export function IncidentList({ items }: { items: IncidentSummary[] }) {
         </span>
       </div>
       {rows.length === 0 ? (
-        <p className="font-mono text-sm text-sev-low">All clear — no incidents match this filter.</p>
+        <div className="rounded-md border border-border bg-surface px-5 py-10 text-center">
+          <p className="font-mono text-sm text-ok">All clear — no incidents match this filter.</p>
+        </div>
       ) : (
-        <div className="border-t border-border">
+        <div className="overflow-hidden rounded-md border border-border border-b-0">
           {rows.map((i) => (
             <IncidentRow key={i.id} incident={i} />
           ))}

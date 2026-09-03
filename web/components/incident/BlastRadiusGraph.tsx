@@ -46,36 +46,80 @@ function nodeColor(n: GraphNode): string {
   }
 }
 
+function nodeFill(n: GraphNode): string {
+  if (n.kind !== 'exposure') return 'var(--canvas)';
+  switch (n.criticality) {
+    case 'CRITICAL':
+    case 'HIGH':
+      return 'var(--sev-high-soft)';
+    case 'MEDIUM':
+      return 'var(--sev-medium-soft)';
+    case 'LOW':
+      return 'var(--sev-low-soft)';
+    default:
+      return 'var(--canvas)';
+  }
+}
+
+const COL_LABELS = ['Root cause', 'Downstream', 'Business exposure'];
+
 export function BlastRadiusGraph({ targets, affected, exposures }: { targets: string[]; affected: string[]; exposures: Exposure[]; }) {
   const reduced = useReducedMotion();
   const { nodes, edges } = layoutGraph(targets, affected, exposures);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const maxRows = Math.max(targets.length, affected.length, exposures.length, 1);
   const height = TOP * 2 + (maxRows - 1) * ROW_H + 20;
+  const activeCols = new Set(nodes.map((n) => n.col));
 
   return (
-    <svg role="img" aria-label="Blast radius" viewBox={`0 0 720 ${height}`} className="w-full">
+    <svg
+      role="img"
+      aria-label="Blast radius"
+      viewBox={`0 -22 720 ${height + 22}`}
+      className="w-full"
+      style={{ minWidth: 560 }}
+    >
+      {COL_LABELS.map((label, i) =>
+        activeCols.has(i as 0 | 1 | 2) ? (
+          <text
+            key={label}
+            x={COL_X[i]}
+            y={-6}
+            textAnchor="middle"
+            className="font-mono uppercase"
+            fontSize={9}
+            letterSpacing={0.6}
+            fill="var(--ink-muted)"
+          >
+            {label}
+          </text>
+        ) : null,
+      )}
       {edges.map((e, i) => {
         const a = pos(byId.get(e.from)!);
         const b = pos(byId.get(e.to)!);
+        const midX = (a.x + 60 + (b.x - 60)) / 2;
         return (
-          <motion.line
+          <motion.path
             key={i}
-            x1={a.x + 60} y1={a.y} x2={b.x - 60} y2={b.y}
-            stroke="var(--border)" strokeWidth={1}
+            d={`M ${a.x + 60} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x - 60} ${b.y}`}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth={1}
             initial={reduced ? undefined : { pathLength: 0, opacity: 0 }}
             whileInView={reduced ? undefined : { pathLength: 1, opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: MOTION.slow, ease: MOTION.easeOut }}
+            transition={{ duration: MOTION.slow, ease: MOTION.easeOut, delay: i * 0.03 }}
           />
         );
       })}
       {nodes.map((n) => {
         const p = pos(n);
         const color = nodeColor(n);
+        const fill = nodeFill(n);
         return (
           <g key={n.id} data-node data-kind={n.kind} transform={`translate(${p.x - 60}, ${p.y - 14})`}>
-            <rect width={120} height={28} rx={3} fill="var(--canvas)" stroke={color} />
+            <rect width={120} height={28} rx={4} fill={fill} stroke={color} />
             <text x={60} y={18} textAnchor="middle" className="font-mono" fontSize={10} fill="var(--ink)">
               {n.label.length > 16 ? `${n.label.slice(0, 15)}…` : n.label}
             </text>

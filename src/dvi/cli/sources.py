@@ -10,11 +10,14 @@ shared, so the two producers cannot decide differently — the M5a seam.
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
 
+from dvi.changes import collect_commits, derive_change_events, resolve_range
 from dvi.incidents import Incident
 from dvi.lineage import LineageGraph, load_dbt_manifest
 from dvi.pipeline import analyze_change, analyze_change_from_profiles
@@ -49,6 +52,10 @@ def _read_frame(path: str) -> pl.DataFrame:
         raise DviError(f"could not read source file {p}: {e}") from e
 
 
+def _dedup_key(change: ChangeEvent) -> tuple[str, tuple[str, ...], datetime]:
+    return (change.id, tuple(sorted(change.targets)), change.timestamp)
+
+
 def _lineage_and_changes(config: DviConfig) -> tuple[LineageGraph, list[ChangeEvent]]:
     manifest_path = Path(config.lineage.manifest)
     if not manifest_path.exists():
@@ -74,7 +81,20 @@ def _lineage_and_changes(config: DviConfig) -> tuple[LineageGraph, list[ChangeEv
                 label=change.label,
             )
         )
-    return lineage, changes
+
+    base, head = resolve_range(os.environ, config.git.base, config.git.head)
+    commits = collect_commits(base, head, cwd=Path.cwd())
+    derived = derive_change_events(commits, lineage.nodes_for_file)
+
+    combined: list[ChangeEvent] = []
+    seen: set[tuple[str, tuple[str, ...], datetime]] = set()
+    for change in [*changes, *derived]:
+        key = _dedup_key(change)
+        if key in seen:
+            continue
+        seen.add(key)
+        combined.append(change)
+    return lineage, combined
 
 
 def _load_model(config: DviConfig) -> LogisticModel | None:
@@ -90,11 +110,15 @@ def _load_model(config: DviConfig) -> LogisticModel | None:
 def incident_from_config(config: DviConfig) -> Incident | None:
     """Analyze the configured before/after snapshot and return an incident."""
     lineage, changes = _lineage_and_changes(config)
+    if not changes:
+        raise DviError(
+            "no change events: declare [[changes]] or run in a git repo whose "
+            "commits touch a modeled asset"
+        )
     model = _load_model(config)
-    # Anchor the observation to the declared changes, not wall-clock: the
-    # before/after diff *is* the observation, and a fixed clock keeps re-runs
-    # deterministic and immune to the RCA lead window going stale as a PR ages.
-    observed_at = max(c.timestamp for c in config.changes)
+    # Anchor the observation to the newest change (declared or derived), not the
+    # wall clock, so re-runs are deterministic and the RCA lead window is stable.
+    observed_at = max(c.timestamp for c in changes)
 
     source = config.source
     if source.kind == "file":

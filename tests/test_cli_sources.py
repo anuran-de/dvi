@@ -6,6 +6,8 @@ import duckdb
 import polars as pl
 import pytest
 
+import dvi.cli.sources as sources_mod
+from dvi.changes import CommitRecord
 from dvi.cli.config import DviConfig, DviError
 from dvi.cli.sources import incident_from_config
 
@@ -194,3 +196,98 @@ def test_warehouse_profiling_failure_raises_dvi_error(tmp_path):
 
     with pytest.raises(DviError):
         incident_from_config(cfg)
+
+
+def _manifest_with_paths(path):
+    manifest = {
+        "nodes": {
+            "model.shop.stg_orders": {
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "original_file_path": "models/stg_orders.sql",
+            },
+            "model.shop.fct_orders": {
+                "resource_type": "model",
+                "depends_on": {"nodes": ["model.shop.stg_orders"]},
+                "original_file_path": "models/fct_orders.sql",
+            },
+        },
+        "exposures": {},
+    }
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_derived_changes_are_unioned_with_none_declared(tmp_path, monkeypatch):
+    _manifest_with_paths(tmp_path / "manifest.json")
+    before = tmp_path / "b.parquet"
+    after = tmp_path / "a.parquet"
+    b, a = _frames()
+    b.write_parquet(before)
+    a.write_parquet(after)
+
+    config = DviConfig.model_validate({
+        "asset": "model.shop.fct_orders",
+        "columns": ["country"],
+        "source": {"kind": "file", "before": str(before), "after": str(after)},
+        "lineage": {"manifest": str(tmp_path / "manifest.json")},
+        # no [[changes]] declared
+    })
+
+    monkeypatch.setattr(sources_mod, "collect_commits", lambda *a, **k: [
+        CommitRecord("abcdef1234", datetime(2026, 8, 25, 9, 50), "deploy stg",
+                     ("models/stg_orders.sql",)),
+    ])
+
+    incident = sources_mod.incident_from_config(config)
+    assert incident is not None  # derived change drove the analysis
+
+
+def test_no_declared_and_no_derived_changes_is_an_error(tmp_path, monkeypatch):
+    _manifest_with_paths(tmp_path / "manifest.json")
+    before = tmp_path / "b.parquet"
+    after = tmp_path / "a.parquet"
+    b, a = _frames()
+    b.write_parquet(before)
+    a.write_parquet(after)
+
+    config = DviConfig.model_validate({
+        "asset": "model.shop.fct_orders",
+        "columns": ["country"],
+        "source": {"kind": "file", "before": str(before), "after": str(after)},
+        "lineage": {"manifest": str(tmp_path / "manifest.json")},
+    })
+    monkeypatch.setattr(sources_mod, "collect_commits", lambda *a, **k: [])
+
+    with pytest.raises(DviError, match="no change events"):
+        sources_mod.incident_from_config(config)
+
+
+def test_explicit_and_derived_duplicate_is_collapsed(tmp_path, monkeypatch):
+    _manifest_with_paths(tmp_path / "manifest.json")
+    before = tmp_path / "b.parquet"
+    after = tmp_path / "a.parquet"
+    b, a = _frames()
+    b.write_parquet(before)
+    a.write_parquet(after)
+
+    config = DviConfig.model_validate({
+        "asset": "model.shop.fct_orders",
+        "columns": ["country"],
+        "source": {"kind": "file", "before": str(before), "after": str(after)},
+        "lineage": {"manifest": str(tmp_path / "manifest.json")},
+        "changes": [{
+            "id": "abcdef1",
+            "targets": ["model.shop.stg_orders"],
+            "timestamp": "2026-08-25T09:50:00",
+        }],
+    })
+    # Derived event identical to the explicit one (same id/targets/timestamp).
+    monkeypatch.setattr(sources_mod, "collect_commits", lambda *a, **k: [
+        CommitRecord("abcdef1000", datetime(2026, 8, 25, 9, 50), "deploy stg",
+                     ("models/stg_orders.sql",)),
+    ])
+
+    lineage, changes = sources_mod._lineage_and_changes(config)
+    ids_targets = [(c.id, tuple(c.targets), c.timestamp) for c in changes]
+    assert ids_targets.count(("abcdef1", ("model.shop.stg_orders",),
+                              datetime(2026, 8, 25, 9, 50))) == 1
